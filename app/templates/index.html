@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 <style>
   :root {
     --fg:#0f172a;
@@ -219,25 +221,35 @@
       {% for slug, name in sources %}<option value="{{ slug }}" {% if slug == filters.source %}selected{% endif %}>{{ name }}</option>{% endfor %}
     </select>
   </label>
-  <label>From <input id="from-input" type="date" name="from_" value="{{ filters.from_ or '' }}"></label>
-  <label>To <input id="to-input" type="date" name="to" value="{{ filters.to or '' }}"></label>
+  <label>Dates
+    <input id="date-range" type="text" placeholder="Any date" autocomplete="off" style="width:200px;cursor:pointer">
+  </label>
+  <input type="hidden" id="from-input" name="from_" value="{{ filters.from_ or '' }}">
+  <input type="hidden" id="to-input" name="to" value="{{ filters.to or '' }}">
   <script>
-    // When From is picked, immediately open the To picker (prefilled to From)
-    // so the user can sweep through a date range in one motion.
     (function () {
-      var f = document.getElementById('from-input');
-      var t = document.getElementById('to-input');
-      f.addEventListener('change', function () {
-        if (!f.value) return;
-        t.min = f.value;
-        if (!t.value || t.value < f.value) t.value = f.value;
-        t.focus();
-        if (typeof t.showPicker === 'function') {
-          try { t.showPicker(); } catch (e) { /* not supported / blocked */ }
+      var fromI = document.getElementById('from-input');
+      var toI   = document.getElementById('to-input');
+      var rangeI = document.getElementById('date-range');
+      var defaults = [];
+      if (fromI.value) defaults.push(fromI.value);
+      if (toI.value)   defaults.push(toI.value);
+      flatpickr(rangeI, {
+        mode: 'range',
+        dateFormat: 'd M Y',
+        altInput: false,
+        defaultDate: defaults,
+        onChange: function (selectedDates) {
+          fromI.value = selectedDates[0] ? formatISO(selectedDates[0]) : '';
+          toI.value   = selectedDates[1] ? formatISO(selectedDates[1]) : '';
         }
       });
-      // Keep To >= From even on initial load.
-      if (f.value) t.min = f.value;
+      function formatISO(d) {
+        var y = d.getFullYear();
+        var m = ('0' + (d.getMonth() + 1)).slice(-2);
+        var day = ('0' + d.getDate()).slice(-2);
+        return y + '-' + m + '-' + day;
+      }
     })();
   </script>
   <label>Max £ <input type="number" name="max_price" value="{{ filters.max_price or '' }}" style="width:80px"></label>
