@@ -22,13 +22,14 @@ scheduler = AsyncIOScheduler()
 @app.on_event("startup")
 async def _startup() -> None:
     init_db()
-    # Refresh once at boot if DB empty, then every 6h.
+    import asyncio, os
+    # If DB is empty, kick off an initial scrape in the BACKGROUND so the
+    # web server starts serving immediately (otherwise nginx returns 502 for
+    # the ~60s the scrape takes).
     with db_session() as s:
         if not s.exec(select(Event)).first():
-            await ingest.run_all()
-    # Nightly refresh at 03:00 local time (TZ comes from the container env / OS).
-    # Overrideable via TRACKDAYFINDER_REFRESH_HOUR / _MINUTE for testing.
-    import os
+            asyncio.create_task(ingest.run_all())
+    # Nightly refresh at 03:00 local time (TZ from container env / OS).
     hour = int(os.environ.get("TRACKDAYFINDER_REFRESH_HOUR", "3"))
     minute = int(os.environ.get("TRACKDAYFINDER_REFRESH_MINUTE", "0"))
     scheduler.add_job(ingest.run_all, "cron", hour=hour, minute=minute, id="refresh")
