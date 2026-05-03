@@ -256,6 +256,11 @@
         onChange: function (selectedDates) {
           fromI.value = selectedDates[0] ? formatISO(selectedDates[0]) : '';
           toI.value   = selectedDates[1] ? formatISO(selectedDates[1]) : '';
+          // Auto-submit only once both ends of the range have been picked
+          // (ensures values are written before the page navigates).
+          if (selectedDates.length === 2) {
+            document.querySelector('form.filters').submit();
+          }
         }
       });
       function formatISO(d) {
@@ -288,14 +293,8 @@
     form.querySelectorAll('input[type=number]').forEach(function (el) {
       el.addEventListener('input', submitDebounced);
     });
-    // Hidden from/to inputs are written by Flatpickr's onChange — submit when
-    // the picker closes (range fully selected).
-    if (window.flatpickr) {
-      var rangeI = document.getElementById('date-range');
-      if (rangeI && rangeI._flatpickr) {
-        rangeI._flatpickr.config.onClose.push(function () { submitNow(); });
-      }
-    }
+    // Date range submits itself from inside Flatpickr's onChange when both
+    // ends have been picked (handled in the picker init script above).
     document.getElementById('clear-filters').addEventListener('click', function () {
       window.location = '/';
     });
