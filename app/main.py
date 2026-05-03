@@ -19,6 +19,14 @@ app = FastAPI(title="TrackdayFinder")
 scheduler = AsyncIOScheduler()
 
 
+def _qs_no_sort(request: Request) -> str:
+    """Current query string with the `sort` param stripped, urlencoded.
+    Used by sort-link template macro so clicking a column preserves filters."""
+    from urllib.parse import urlencode
+    params = [(k, v) for k, v in request.query_params.multi_items() if k != "sort"]
+    return urlencode(params)
+
+
 @app.on_event("startup")
 async def _startup() -> None:
     init_db()
@@ -45,7 +53,8 @@ async def index(request: Request,
                 from_: Optional[str] = None,
                 to: Optional[str] = None,
                 max_price: Optional[str] = None,
-                hide_sold_out: Optional[str] = None):
+                hide_sold_out: Optional[str] = None,
+                sort: Optional[str] = None):
     with db_session() as s:
         today = date.today()
         q = select(Event).where(Event.event_date >= today)
@@ -72,7 +81,19 @@ async def index(request: Request,
                 pass
         if hide_sold_out:
             q = q.where(Event.sold_out == False)  # noqa: E712
-        q = q.order_by(Event.event_date)
+        # Sort: default by date asc; "price" = cheapest first (NULLs last);
+        # "price-desc" = priciest first; "date-desc" = furthest future first.
+        from sqlmodel import asc, desc as sql_desc
+        sort_key = (sort or "date").lower()
+        if sort_key == "price":
+            q = q.order_by(Event.price_gbp.is_(None), asc(Event.price_gbp), Event.event_date)
+        elif sort_key == "price-desc":
+            q = q.order_by(Event.price_gbp.is_(None), sql_desc(Event.price_gbp), Event.event_date)
+        elif sort_key == "date-desc":
+            q = q.order_by(sql_desc(Event.event_date))
+        else:
+            sort_key = "date"
+            q = q.order_by(Event.event_date)
         events = s.exec(q).all()
 
         all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
@@ -93,6 +114,8 @@ async def index(request: Request,
         "sessions": sessions,
         "last_run": last.finished_at.strftime("%Y-%m-%d %H:%M") if last and last.finished_at else None,
         "now_year": today.year,
+        "sort": sort_key,
+        "qs_no_sort": _qs_no_sort(request),
         "filters": {
             "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
             "from_": from_, "to": to, "max_price": max_price,

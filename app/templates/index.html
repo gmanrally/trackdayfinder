@@ -64,11 +64,25 @@
   <a href="/" style="font-size:12px;color:var(--muted)">reset</a>
 </form>
 
+{% macro sort_link(label, key, current, qs, right=False) -%}
+  {%- set next_key = key -%}
+  {%- if current == key -%}{% set next_key = key ~ '-desc' %}
+  {%- elif current == key ~ '-desc' -%}{% set next_key = key %}
+  {%- endif -%}
+  {%- set arrow = '' -%}
+  {%- if current == key %}{% set arrow = ' ▲' %}
+  {%- elif current == (key ~ '-desc') %}{% set arrow = ' ▼' %}{% endif -%}
+  <a href="?{{ qs }}&amp;sort={{ next_key }}" style="color:inherit;text-decoration:none">{{ label }}{{ arrow }}</a>
+{%- endmacro %}
+
 {% if events %}
 <table>
   <thead><tr>
-    <th>Date</th><th>Circuit</th><th>Session</th><th>Organiser</th><th>Title</th>
-    <th>Vehicle</th><th>Group</th><th>Noise</th><th class="right">Price</th><th>Stock</th><th>Book</th>
+    <th>{{ sort_link('Date', 'date', sort, qs_no_sort) }}</th>
+    <th>Circuit</th><th>Session</th><th>Organiser</th><th>Title</th>
+    <th>Vehicle</th><th>Group</th><th>Noise</th>
+    <th class="right">{{ sort_link('Price', 'price', sort, qs_no_sort, right=True) }}</th>
+    <th>Stock</th><th>Book</th>
   </tr></thead>
   <tbody>
   {% for e in events %}
