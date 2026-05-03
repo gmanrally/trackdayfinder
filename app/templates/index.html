@@ -237,26 +237,20 @@
       var fromI = document.getElementById('from-input');
       var toI   = document.getElementById('to-input');
       var rangeI = document.getElementById('date-range');
-      // Parse ISO YYYY-MM-DD into a local Date (avoid UTC shift) and pass as
-      // Date objects so flatpickr doesn't try to re-parse the string with the
-      // display dateFormat ("d M Y") which mis-reads "2026-05-20".
-      function parseISO(s) {
-        var p = s.split('-');
-        return new Date(parseInt(p[0],10), parseInt(p[1],10) - 1, parseInt(p[2],10));
-      }
-      var defaults = [];
-      if (fromI.value) defaults.push(parseISO(fromI.value));
-      if (toI.value)   defaults.push(parseISO(toI.value));
       var todayIso = '{{ today_iso }}';
+      var defaults = [];
+      if (fromI.value) defaults.push(fromI.value);
+      if (toI.value)   defaults.push(toI.value);
       flatpickr(rangeI, {
         mode: 'range',
-        dateFormat: 'd M Y',
-        altInput: false,
+        // Internal/parse format = ISO so all string inputs (defaults, minDate)
+        // are unambiguous. The user sees the alt format below.
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'd M Y',
         defaultDate: defaults,
-        minDate: todayIso,                  // can't pick past events anyway
-        defaultHour: 0,                     // suppress time defaults
+        minDate: todayIso,
         onReady: function (_, __, fp) {
-          // Open showing today's month even if no date selected yet.
           if (defaults.length === 0) fp.jumpToDate(todayIso);
         },
         onChange: function (selectedDates) {
