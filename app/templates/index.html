@@ -50,10 +50,10 @@
     box-shadow: 0 1px 0 rgba(255,255,255,0.05), 0 6px 20px rgba(0,0,0,0.25);
   }
   header h1 {
-    font-size: 18px; font-weight: 700; margin: 0;
-    letter-spacing: -0.01em;
+    font-size: 26px; font-weight: 700; margin: 0;
+    color: #ffffff; letter-spacing: -0.015em;
   }
-  header .tagline { color: #94a3b8; }
+  header .tagline { color: #94a3b8; font-size: 13px; }
   header .tagline a { color: #f8fafc; text-decoration: none; border-bottom: 1px dashed #475569; }
   header .tagline a:hover { color: #fff; border-color: #fff; }
   header .meta {
@@ -99,11 +99,18 @@
     padding: 8px 16px; font-weight: 600;
     background: var(--accent); color: #fff;
     border: 0; border-radius: 6px; cursor: pointer;
-    transition: background .15s, transform .05s;
+    transition: background .15s, transform .05s, border-color .15s;
     box-shadow: var(--shadow-sm);
   }
   form.filters button:hover { background: var(--accent-2); }
   form.filters button:active { transform: translateY(1px); }
+  form.filters button.btn-clear {
+    background: #fff; color: var(--fg);
+    border: 1px solid var(--line-2);
+  }
+  form.filters button.btn-clear:hover {
+    background: #f8fafc; border-color: var(--accent); color: var(--accent);
+  }
   form.filters a { font-size: 12px; color: var(--muted); text-decoration: none; }
   form.filters a:hover { color: var(--accent); }
 
@@ -115,7 +122,7 @@
     background: #1f2937; color: #f1f5f9;
     font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
     padding: 11px 14px; text-align: left;
-    border-bottom: 2px solid var(--accent);
+    border-bottom: 1px solid var(--line);
     border-right: 1px solid #374151;
     box-shadow: 0 2px 6px rgba(15,23,42,0.12);
     white-space: nowrap;
@@ -187,10 +194,9 @@
 </head>
 <body>
 <header>
-  <h1>🏁 TrackdayFinder</h1>
-  <span class="tagline" style="color:#bbb;font-size:12px;margin-left:8px">
-    TrackdayFinder.co.uk kindly provided by
-    <a href="https://gmracing.co.uk" target="_blank" rel="noopener" style="color:#fff;text-decoration:underline">GMRacing.co.uk</a>
+  <h1>🏁 TrackdayFinder.co.uk</h1>
+  <span class="tagline">kindly provided by
+    <a href="https://gmracing.co.uk" target="_blank" rel="noopener">GMRacing.co.uk</a>
   </span>
   <span class="meta">{{ count }} events · last refresh {{ last_run or "never" }}</span>
 </header>
@@ -254,9 +260,39 @@
   </script>
   <label>Max £ <input type="number" name="max_price" value="{{ filters.max_price or '' }}" style="width:80px"></label>
   <label><input type="checkbox" name="hide_sold_out" {% if filters.hide_sold_out %}checked{% endif %}> Hide sold out</label>
-  <button type="submit">Apply</button>
-  <a href="/" style="font-size:12px;color:var(--muted)">reset</a>
+  <button type="button" id="clear-filters" class="btn-clear">Clear filters</button>
 </form>
+
+<script>
+  // Auto-submit when any filter changes; debounce text/number fields slightly.
+  (function () {
+    var form = document.querySelector('form.filters');
+    if (!form) return;
+    var debounceTimer;
+    function submitNow() { form.submit(); }
+    function submitDebounced() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(submitNow, 350);
+    }
+    form.querySelectorAll('select, input[type=checkbox]').forEach(function (el) {
+      el.addEventListener('change', submitNow);
+    });
+    form.querySelectorAll('input[type=number]').forEach(function (el) {
+      el.addEventListener('input', submitDebounced);
+    });
+    // Hidden from/to inputs are written by Flatpickr's onChange — submit when
+    // the picker closes (range fully selected).
+    if (window.flatpickr) {
+      var rangeI = document.getElementById('date-range');
+      if (rangeI && rangeI._flatpickr) {
+        rangeI._flatpickr.config.onClose.push(function () { submitNow(); });
+      }
+    }
+    document.getElementById('clear-filters').addEventListener('click', function () {
+      window.location = '/';
+    });
+  })();
+</script>
 
 {% macro sort_link(label, key, current, qs, right=False) -%}
   {%- set next_key = key -%}
