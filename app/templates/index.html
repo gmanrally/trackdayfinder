@@ -53,7 +53,7 @@
   <label>Source
     <select name="source">
       <option value="">All</option>
-      {% for s in sources %}<option value="{{ s }}" {% if s == filters.source %}selected{% endif %}>{{ s }}</option>{% endfor %}
+      {% for slug, name in sources %}<option value="{{ slug }}" {% if slug == filters.source %}selected{% endif %}>{{ name }}</option>{% endfor %}
     </select>
   </label>
   <label>From <input type="date" name="from_" value="{{ filters.from_ or '' }}"></label>
@@ -76,7 +76,7 @@
       <td>{{ e.event_date.strftime('%a %d %b %Y') }}</td>
       <td>{{ e.circuit }}</td>
       <td>{% if e.session and e.session != 'day' %}<span class="pill" style="background:#fde">{{ e.session }}</span>{% else %}{{ e.session or '' }}{% endif %}</td>
-      <td><span class="pill">{{ e.source }}</span> {{ e.organiser }}</td>
+      <td>{{ e.organiser }}</td>
       <td>{{ e.title or '' }}</td>
       <td>{{ e.vehicle_type or '' }}</td>
       <td>{{ e.group_level or '' }}</td>

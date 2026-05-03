@@ -77,7 +77,11 @@ async def index(request: Request,
 
         all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
         circuits = sorted({e.circuit for e in all_events})
-        sources = sorted({e.source for e in all_events})
+        # Build (slug, display_name) pairs for the Source dropdown.
+        from .scrapers import ORGANISER_DISPLAY
+        source_slugs = sorted({e.source for e in all_events})
+        sources = [(slug, ORGANISER_DISPLAY.get(slug, slug.replace("_", " ").title()))
+                   for slug in source_slugs]
         sessions = sorted({e.session for e in all_events if e.session})
         last = s.exec(select(ScrapeRun).order_by(ScrapeRun.finished_at.desc())).first()
 
