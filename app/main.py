@@ -88,6 +88,7 @@ async def index(request: Request,
         "sources": sources,
         "sessions": sessions,
         "last_run": last.finished_at.strftime("%Y-%m-%d %H:%M") if last and last.finished_at else None,
+        "now_year": today.year,
         "filters": {
             "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
             "from_": from_, "to": to, "max_price": max_price,
