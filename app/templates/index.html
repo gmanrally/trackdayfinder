@@ -6,12 +6,19 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
   :root { --fg:#111; --muted:#666; --bg:#fafafa; --card:#fff; --line:#e3e3e3; --accent:#c0392b; }
-  body { font:14px/1.4 system-ui, sans-serif; color:var(--fg); background:var(--bg); margin:0; }
-  header { padding:16px 20px; background:#111; color:#fff; display:flex; align-items:center; gap:16px; }
+  html, body { height:100%; }
+  body { font:14px/1.4 system-ui, sans-serif; color:var(--fg); background:var(--bg); margin:0;
+         display:flex; flex-direction:column; min-height:100vh; }
+  header { padding:16px 20px; background:#111; color:#fff; display:flex; align-items:center; gap:16px;
+           position:sticky; top:0; z-index:30; flex:0 0 auto; }
   header h1 { font-size:18px; margin:0; }
   header .meta { color:#aaa; font-size:12px; margin-left:auto; }
   form.filters { padding:12px 20px; background:#fff; border-bottom:1px solid var(--line);
-                 display:flex; flex-wrap:wrap; gap:10px; align-items:end; }
+                 display:flex; flex-wrap:wrap; gap:10px; align-items:end;
+                 position:sticky; top:0; z-index:20; flex:0 0 auto; }
+  .table-scroll { flex:1 1 auto; overflow:auto; background:var(--card); }
+  thead th { position:sticky; top:0; z-index:10; box-shadow:0 1px 0 var(--line); }
+  footer { flex:0 0 auto; }
   form.filters label { display:flex; flex-direction:column; font-size:12px; color:var(--muted); }
   form.filters input, form.filters select { padding:6px 8px; font:14px system-ui; border:1px solid var(--line); border-radius:4px; }
   form.filters button { padding:7px 14px; background:var(--accent); color:#fff; border:0; border-radius:4px; cursor:pointer; }
@@ -95,6 +102,7 @@
 {%- endmacro %}
 
 {% if events %}
+<div class="table-scroll">
 <table>
   <thead><tr>
     <th>{{ sort_link('Date', 'date', sort, qs_no_sort) }}</th>
@@ -129,6 +137,7 @@
   {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
   <div class="empty">No events match. Try clearing filters or run a refresh.</div>
 {% endif %}
