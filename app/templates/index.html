@@ -60,14 +60,16 @@
     border: 1px solid rgba(255,255,255,0.06);
   }
 
-  /* Filters bar */
+  /* Filters bar — single row, scrolls horizontally if too narrow */
   form.filters {
     padding: 14px 24px; background: var(--card);
     border-bottom: 1px solid var(--line);
-    display: flex; flex-wrap: wrap; gap: 12px 14px; align-items: end;
+    display: flex; flex-wrap: nowrap; gap: 14px; align-items: end;
+    overflow-x: auto;
     position: sticky; top: 0; z-index: 20; flex: 0 0 auto;
     box-shadow: var(--shadow-sm);
   }
+  form.filters > * { flex: 0 0 auto; }
   form.filters label {
     display: flex; flex-direction: column; gap: 4px;
     font-size: 11px; font-weight: 600; color: var(--muted);
@@ -112,21 +114,42 @@
     font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
     padding: 10px 14px; text-align: left;
     border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
     box-shadow: 0 1px 0 var(--line);
     white-space: nowrap;
   }
+  thead th:last-child { border-right: none; }
   thead th a { color: inherit; text-decoration: none; }
   thead th a:hover { color: var(--accent); }
   tbody td {
-    padding: 10px 14px; border-bottom: 1px solid var(--line);
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
     vertical-align: middle;
   }
+  tbody td:last-child { border-right: none; }
   tbody tr:hover td { background: var(--hi-bg); }
   tbody tr:last-child td { border-bottom: none; }
   tr.soldout td { opacity: 0.45; text-decoration: line-through; }
   td.right { text-align: right; }
   td a { color: var(--accent); font-weight: 600; text-decoration: none; }
   td a:hover { text-decoration: underline; }
+
+  /* Book button */
+  .book-btn {
+    display: inline-block;
+    padding: 6px 14px;
+    background: var(--accent); color: #fff !important;
+    font-size: 12px; font-weight: 600;
+    border-radius: 6px;
+    text-decoration: none !important;
+    transition: background .15s, transform .05s;
+    box-shadow: var(--shadow-sm);
+    white-space: nowrap;
+  }
+  .book-btn:hover { background: var(--accent-2); }
+  .book-btn:active { transform: translateY(1px); }
+  tr.soldout .book-btn { background: var(--muted-2); pointer-events: none; }
 
   /* Pills */
   .pill {
@@ -257,7 +280,7 @@
           <span class="pill" style="background:#fef3c7;color:#92400e">{{ e.stock_status }}</span>
         {%- endif -%}
       </td>
-      <td><a href="{{ e.booking_url }}" target="_blank" rel="noopener">Book →</a></td>
+      <td><a class="book-btn" href="{{ e.booking_url }}" target="_blank" rel="noopener">Book →</a></td>
     </tr>
   {% endfor %}
   </tbody>
