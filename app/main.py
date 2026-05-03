@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -95,12 +95,6 @@ async def index(request: Request,
             "hide_sold_out": bool(hide_sold_out),
         },
     })
-
-
-@app.post("/refresh")
-async def refresh():
-    await ingest.run_all()
-    return RedirectResponse("/", status_code=303)
 
 
 @app.get("/api/events")
