@@ -237,9 +237,16 @@
       var fromI = document.getElementById('from-input');
       var toI   = document.getElementById('to-input');
       var rangeI = document.getElementById('date-range');
+      // Parse ISO YYYY-MM-DD into a local Date (avoid UTC shift) and pass as
+      // Date objects so flatpickr doesn't try to re-parse the string with the
+      // display dateFormat ("d M Y") which mis-reads "2026-05-20".
+      function parseISO(s) {
+        var p = s.split('-');
+        return new Date(parseInt(p[0],10), parseInt(p[1],10) - 1, parseInt(p[2],10));
+      }
       var defaults = [];
-      if (fromI.value) defaults.push(fromI.value);
-      if (toI.value)   defaults.push(toI.value);
+      if (fromI.value) defaults.push(parseISO(fromI.value));
+      if (toI.value)   defaults.push(parseISO(toI.value));
       var todayIso = '{{ today_iso }}';
       flatpickr(rangeI, {
         mode: 'range',
