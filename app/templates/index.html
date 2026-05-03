@@ -57,6 +57,14 @@
   header .tagline { color: #94a3b8; font-size: 13px; }
   header .tagline a { color: #f8fafc; text-decoration: none; border-bottom: 1px dashed #475569; }
   header .tagline a:hover { color: #fff; border-color: #fff; }
+
+  /* GMRacing brand mark — all white, R in red. Used in header (dark bg) and
+     footer (light bg, dark variant overrides white -> dark text). */
+  .brand-gmracing { font-weight: 600; color: #ffffff; }
+  .brand-gmracing .brand-r { color: var(--accent); }
+  .brand-gmracing-dark { color: #1f2937; }
+  footer .brand-gmracing { text-decoration: none; }
+  footer .brand-gmracing:hover { text-decoration: underline; }
   header .meta {
     color: #94a3b8; font-size: 12px; margin-left: auto;
     background: rgba(255,255,255,0.04); padding: 6px 12px; border-radius: 999px;
@@ -197,7 +205,7 @@
 <header>
   <h1>🏁 TrackdayFinder.co.uk</h1>
   <span class="tagline">kindly provided by
-    <a href="https://gmracing.co.uk" target="_blank" rel="noopener">GMRacing.co.uk</a>
+    <a class="brand-gmracing" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a>
   </span>
   <span class="meta">{{ count }} events · last refresh {{ last_run or "never" }}</span>
 </header>
@@ -355,7 +363,7 @@
 {% endif %}
 
 <footer style="text-align:center;padding:10px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;background:var(--card)">
-  &copy; {{ now_year }} <a href="https://gmracing.co.uk" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">gmracing.co.uk</a> &middot; All rights reserved.
+  &copy; {{ now_year }} <a class="brand-gmracing brand-gmracing-dark" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a> &middot; All rights reserved.
   Listings aggregated from public organiser sites; bookings handled by the respective organisers.
 </footer>
 
