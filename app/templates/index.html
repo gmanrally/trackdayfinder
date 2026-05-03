@@ -240,11 +240,18 @@
       var defaults = [];
       if (fromI.value) defaults.push(fromI.value);
       if (toI.value)   defaults.push(toI.value);
+      var todayIso = '{{ today_iso }}';
       flatpickr(rangeI, {
         mode: 'range',
         dateFormat: 'd M Y',
         altInput: false,
         defaultDate: defaults,
+        minDate: todayIso,                  // can't pick past events anyway
+        defaultHour: 0,                     // suppress time defaults
+        onReady: function (_, __, fp) {
+          // Open showing today's month even if no date selected yet.
+          if (defaults.length === 0) fp.jumpToDate(todayIso);
+        },
         onChange: function (selectedDates) {
           fromI.value = selectedDates[0] ? formatISO(selectedDates[0]) : '';
           toI.value   = selectedDates[1] ? formatISO(selectedDates[1]) : '';

@@ -114,6 +114,7 @@ async def index(request: Request,
         "sessions": sessions,
         "last_run": last.finished_at.strftime("%Y-%m-%d %H:%M") if last and last.finished_at else None,
         "now_year": today.year,
+        "today_iso": today.isoformat(),
         "sort": sort_key,
         "qs_no_sort": _qs_no_sort(request),
         "filters": {
