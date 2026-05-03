@@ -1,0 +1,14 @@
+# Optional: host-side nightly refresh, independent of the web app process.
+# Install with:
+#   sudo cp deploy/trackdayfinder-refresh.cron /etc/cron.d/trackdayfinder-refresh
+#   sudo chmod 644 /etc/cron.d/trackdayfinder-refresh
+#
+# This is a belt-and-braces backup — the in-process APScheduler in app/main.py
+# already runs nightly at 03:00. Use this if you ever run the container with
+# the scheduler disabled, or if you want a second log trail.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# Run at 03:30 (offset from in-app schedule so they don't collide)
+30 3 * * * root cd /opt/trackdayfinder && /usr/bin/docker compose exec -T app python -m app.cli refresh >> /var/log/trackdayfinder-refresh.log 2>&1

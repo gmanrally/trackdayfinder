@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>TrackdayFinder</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --fg:#111; --muted:#666; --bg:#fafafa; --card:#fff; --line:#e3e3e3; --accent:#c0392b; }
+  body { font:14px/1.4 system-ui, sans-serif; color:var(--fg); background:var(--bg); margin:0; }
+  header { padding:16px 20px; background:#111; color:#fff; display:flex; align-items:center; gap:16px; }
+  header h1 { font-size:18px; margin:0; }
+  header .meta { color:#aaa; font-size:12px; margin-left:auto; }
+  form.filters { padding:12px 20px; background:#fff; border-bottom:1px solid var(--line);
+                 display:flex; flex-wrap:wrap; gap:10px; align-items:end; }
+  form.filters label { display:flex; flex-direction:column; font-size:12px; color:var(--muted); }
+  form.filters input, form.filters select { padding:6px 8px; font:14px system-ui; border:1px solid var(--line); border-radius:4px; }
+  form.filters button { padding:7px 14px; background:var(--accent); color:#fff; border:0; border-radius:4px; cursor:pointer; }
+  table { width:100%; border-collapse:collapse; background:var(--card); }
+  th, td { padding:8px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { background:#f0f0f0; font-size:12px; text-transform:uppercase; color:#444; }
+  tr.soldout td { opacity:0.5; text-decoration:line-through; }
+  td.right { text-align:right; }
+  .pill { display:inline-block; padding:1px 6px; border-radius:10px; background:#eee; font-size:11px; color:#444; }
+  .empty { padding:40px; text-align:center; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏁 TrackdayFinder</h1>
+  <span class="meta">{{ count }} events · last refresh {{ last_run or "never" }}</span>
+  <form method="post" action="/refresh" style="margin:0">
+    <button style="padding:6px 10px;background:#444;color:#fff;border:0;border-radius:4px;cursor:pointer">Refresh now</button>
+  </form>
+</header>
+
+<form class="filters" method="get" action="/">
+  <label>Circuit
+    <select name="circuit">
+      <option value="">Any</option>
+      {% for c in circuits %}<option value="{{ c }}" {% if c == filters.circuit %}selected{% endif %}>{{ c }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Vehicle
+    <select name="vehicle">
+      <option value="">Any</option>
+      <option value="car" {% if filters.vehicle == 'car' %}selected{% endif %}>Car</option>
+      <option value="bike" {% if filters.vehicle == 'bike' %}selected{% endif %}>Bike</option>
+    </select>
+  </label>
+  <label>Session
+    <select name="session">
+      <option value="">Any</option>
+      {% for s in sessions %}<option value="{{ s }}" {% if s == filters.session %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Source
+    <select name="source">
+      <option value="">All</option>
+      {% for s in sources %}<option value="{{ s }}" {% if s == filters.source %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>From <input type="date" name="from_" value="{{ filters.from_ or '' }}"></label>
+  <label>To <input type="date" name="to" value="{{ filters.to or '' }}"></label>
+  <label>Max £ <input type="number" name="max_price" value="{{ filters.max_price or '' }}" style="width:80px"></label>
+  <label><input type="checkbox" name="hide_sold_out" {% if filters.hide_sold_out %}checked{% endif %}> Hide sold out</label>
+  <button type="submit">Apply</button>
+  <a href="/" style="font-size:12px;color:var(--muted)">reset</a>
+</form>
+
+{% if events %}
+<table>
+  <thead><tr>
+    <th>Date</th><th>Circuit</th><th>Session</th><th>Organiser</th><th>Title</th>
+    <th>Vehicle</th><th>Group</th><th>Noise</th><th class="right">Price</th><th>Stock</th><th>Book</th>
+  </tr></thead>
+  <tbody>
+  {% for e in events %}
+    <tr class="{% if e.sold_out %}soldout{% endif %}">
+      <td>{{ e.event_date.strftime('%a %d %b %Y') }}</td>
+      <td>{{ e.circuit }}</td>
+      <td>{% if e.session and e.session != 'day' %}<span class="pill" style="background:#fde">{{ e.session }}</span>{% else %}{{ e.session or '' }}{% endif %}</td>
+      <td><span class="pill">{{ e.source }}</span> {{ e.organiser }}</td>
+      <td>{{ e.title or '' }}</td>
+      <td>{{ e.vehicle_type or '' }}</td>
+      <td>{{ e.group_level or '' }}</td>
+      <td>{{ e.noise_limit_db ~ ' dB' if e.noise_limit_db else '' }}</td>
+      <td class="right">{{ '£%.0f' % e.price_gbp if e.price_gbp else '' }}</td>
+      <td>
+        {%- if e.sold_out -%}
+          <span class="pill" style="background:#444;color:#fff">Sold out</span>
+        {%- elif e.spaces_left is not none -%}
+          <span class="pill" style="background:{% if e.spaces_left <= 3 %}#c0392b;color:#fff{% else %}#f1c40f{% endif %}">{{ e.spaces_left }} left</span>
+        {%- elif e.stock_status -%}
+          <span class="pill" style="background:#f1c40f">{{ e.stock_status }}</span>
+        {%- endif -%}
+      </td>
+      <td><a href="{{ e.booking_url }}" target="_blank" rel="noopener">Book →</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <div class="empty">No events match. Try clearing filters or run a refresh.</div>
+{% endif %}
+</body>
+</html>

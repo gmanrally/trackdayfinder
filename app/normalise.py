@@ -1,0 +1,70 @@
+import hashlib
+import re
+from datetime import date
+
+# Canonical circuit names. Keys are lowercase tokens that may appear in
+# scraped strings; the value is the canonical display name.
+CIRCUIT_ALIASES = {
+    "silverstone": "Silverstone",
+    "donington": "Donington Park",
+    "brands hatch": "Brands Hatch",
+    "brands": "Brands Hatch",
+    "snetterton": "Snetterton",
+    "oulton": "Oulton Park",
+    "cadwell": "Cadwell Park",
+    "castle combe": "Castle Combe",
+    "anglesey": "Anglesey",
+    "trac mon": "Anglesey",
+    "bedford": "Bedford Autodrome",
+    "thruxton": "Thruxton",
+    "croft": "Croft",
+    "knockhill": "Knockhill",
+    "pembrey": "Pembrey",
+    "blyton": "Blyton Park",
+    "rockingham": "Rockingham",
+    "mallory": "Mallory Park",
+    "lydden": "Lydden Hill",
+    "goodwood": "Goodwood",
+    "llandow": "Llandow",
+    "curborough": "Curborough",
+}
+
+
+def canonical_circuit(raw: str) -> str:
+    s = re.sub(r"\s+", " ", raw or "").strip().lower()
+    for token, canonical in CIRCUIT_ALIASES.items():
+        if token in s:
+            return canonical
+    return raw.strip() if raw else "Unknown"
+
+
+def parse_price(text: str) -> float | None:
+    if not text:
+        return None
+    m = re.search(r"£\s*([\d,]+(?:\.\d+)?)", text)
+    if not m:
+        m = re.search(r"([\d,]+(?:\.\d+)?)", text)
+    if not m:
+        return None
+    try:
+        return float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+
+
+def parse_noise(text: str) -> int | None:
+    if not text:
+        return None
+    m = re.search(r"(\d{2,3})\s*db", text, flags=re.I)
+    return int(m.group(1)) if m else None
+
+
+def make_dedup_key(source: str, circuit: str, event_date: date, organiser: str,
+                   external_id: str | None = None, session: str | None = None) -> str:
+    parts = [source, organiser.lower(), circuit.lower(), event_date.isoformat()]
+    if external_id:
+        parts.append(external_id.lower())
+    elif session:
+        parts.append(session.lower())
+    raw = "|".join(parts)
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:20]

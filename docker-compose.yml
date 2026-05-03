@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    container_name: trackdayfinder
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8766:8766"   # only expose to localhost; nginx terminates TLS
+    volumes:
+      - trackdayfinder_data:/data  # persistent SQLite + debug dumps
+    environment:
+      - TRACKDAYFINDER_DATA=/data
+      - TZ=Europe/London
+
+volumes:
+  trackdayfinder_data:
