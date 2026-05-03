@@ -2,8 +2,15 @@ FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
 
 WORKDIR /app
 
-# tzdata so APScheduler can resolve "Europe/London" via tzlocal/zoneinfo
-RUN apt-get update && apt-get install -y --no-install-recommends tzdata && rm -rf /var/lib/apt/lists/*
+# tzdata so APScheduler can resolve "Europe/London" via tzlocal/zoneinfo.
+# Pre-set TZ + DEBIAN_FRONTEND so the apt install doesn't prompt for a region.
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Europe/London
+RUN ln -fs /usr/share/zoneinfo/Europe/London /etc/localtime \
+    && echo "Europe/London" > /etc/timezone \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first (cached layer)
 COPY requirements.txt .
