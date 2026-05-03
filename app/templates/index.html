@@ -110,17 +110,18 @@
   table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--card); }
   thead th {
     position: sticky; top: 0; z-index: 10;
-    background: #f8fafc; color: var(--muted);
-    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
-    padding: 10px 14px; text-align: left;
-    border-bottom: 1px solid var(--line);
-    border-right: 1px solid var(--line);
-    box-shadow: 0 1px 0 var(--line);
+    background: #1f2937; color: #f1f5f9;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+    padding: 11px 14px; text-align: left;
+    border-bottom: 2px solid var(--accent);
+    border-right: 1px solid #374151;
+    box-shadow: 0 2px 6px rgba(15,23,42,0.12);
     white-space: nowrap;
   }
   thead th:last-child { border-right: none; }
   thead th a { color: inherit; text-decoration: none; }
   thead th a:hover { color: var(--accent); }
+
   tbody td {
     padding: 10px 14px;
     border-bottom: 1px solid var(--line);
@@ -128,6 +129,9 @@
     vertical-align: middle;
   }
   tbody td:last-child { border-right: none; }
+  /* Zebra striping for row separation */
+  tbody tr:nth-child(odd)  td { background: #ffffff; }
+  tbody tr:nth-child(even) td { background: #f1f5f9; }
   tbody tr:hover td { background: var(--hi-bg); }
   tbody tr:last-child td { border-bottom: none; }
   tr.soldout td { opacity: 0.45; text-decoration: line-through; }
