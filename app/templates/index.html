@@ -220,20 +220,24 @@
     </select>
   </label>
   <label>From <input id="from-input" type="date" name="from_" value="{{ filters.from_ or '' }}"></label>
-  <label>To <input id="to-input" type="date" name="to" value="{{ filters.to or '' }}" {% if filters.same_day %}disabled{% endif %}></label>
-  <label><input id="same-day" type="checkbox" name="same_day" {% if filters.same_day %}checked{% endif %}> Single day</label>
+  <label>To <input id="to-input" type="date" name="to" value="{{ filters.to or '' }}"></label>
   <script>
+    // When From is picked, immediately open the To picker (prefilled to From)
+    // so the user can sweep through a date range in one motion.
     (function () {
       var f = document.getElementById('from-input');
       var t = document.getElementById('to-input');
-      var s = document.getElementById('same-day');
-      function sync() {
-        if (s.checked) { t.value = f.value; t.disabled = true; }
-        else { t.disabled = false; }
-      }
-      s.addEventListener('change', sync);
-      f.addEventListener('change', sync);
-      sync();
+      f.addEventListener('change', function () {
+        if (!f.value) return;
+        t.min = f.value;
+        if (!t.value || t.value < f.value) t.value = f.value;
+        t.focus();
+        if (typeof t.showPicker === 'function') {
+          try { t.showPicker(); } catch (e) { /* not supported / blocked */ }
+        }
+      });
+      // Keep To >= From even on initial load.
+      if (f.value) t.min = f.value;
     })();
   </script>
   <label>Max £ <input type="number" name="max_price" value="{{ filters.max_price or '' }}" style="width:80px"></label>
