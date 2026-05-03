@@ -54,6 +54,7 @@ async def index(request: Request,
                 to: Optional[str] = None,
                 max_price: Optional[str] = None,
                 hide_sold_out: Optional[str] = None,
+                same_day: Optional[str] = None,
                 sort: Optional[str] = None):
     with db_session() as s:
         today = date.today()
@@ -66,6 +67,9 @@ async def index(request: Request,
             q = q.where(Event.source == source)
         if session:
             q = q.where(Event.session == session)
+        # If "Same day" is ticked and From is set, force To = From.
+        if same_day and from_:
+            to = from_
         if from_:
             try: q = q.where(Event.event_date >= date.fromisoformat(from_))
             except ValueError: pass
@@ -120,6 +124,7 @@ async def index(request: Request,
             "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "same_day": bool(same_day),
         },
     })
 
