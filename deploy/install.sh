@@ -37,19 +37,24 @@ fi
 cd "$APP_DIR"
 docker compose up -d --build
 
-# nginx + Let's Encrypt
+# nginx — install HTTP-only config first; certbot rewrites it with HTTPS.
 sed "s/YOUR-DOMAIN.COM/$DOMAIN/g" deploy/nginx.conf > /etc/nginx/sites-available/trackdayfinder
 ln -sf /etc/nginx/sites-available/trackdayfinder /etc/nginx/sites-enabled/trackdayfinder
 rm -f /etc/nginx/sites-enabled/default
+nginx -t && systemctl reload nginx
 
-# Initial cert via certbot (snap)
+# certbot via snap
 apt-get install -y snapd
 snap install core; snap refresh core
 snap install --classic certbot
 ln -sf /snap/bin/certbot /usr/bin/certbot
-certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos -m "$EMAIL" --redirect
 
-systemctl reload nginx
+# Issue cert AND let certbot edit the nginx config to add the HTTPS server
+# block + 80 -> 443 redirect (idempotent — re-running is safe).
+certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" \
+    --non-interactive --agree-tos -m "$EMAIL" --redirect
+
+nginx -t && systemctl reload nginx
 
 # Firewall: only 22, 80, 443
 ufw allow OpenSSH
