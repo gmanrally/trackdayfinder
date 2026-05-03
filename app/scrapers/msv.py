@@ -83,10 +83,13 @@ def _parse_row(row: Node, vehicle: str, base_url: str) -> Optional[RawEvent]:
     layout = (row.css_first(".event-circuit-layout").text(strip=True) if row.css_first(".event-circuit-layout") else "")
     circuit_raw = f"{venue} {layout}".strip() if layout else venue
 
+    # MSV occasionally publishes a wrong "From £30" sentinel on the listing
+    # for events whose real lowest price is hundreds. Drop anything below
+    # £50 — no real UK car/bike trackday is that cheap.
     price_text = None
     btn_text = link.text(strip=True)
     pm = PRICE_RE.search(btn_text.replace(",", ""))
-    if pm:
+    if pm and float(pm.group(1)) >= 50:
         price_text = f"£{pm.group(1)}"
 
     # Availability: MSV uses several variants in the same cell.
