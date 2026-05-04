@@ -49,6 +49,22 @@ app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 scheduler = AsyncIOScheduler()
 
 
+# Many scrapers (Facebook's link debugger, monitoring uptime checks, link
+# previewers in Slack/iMessage etc.) probe URLs with HEAD before doing GET.
+# FastAPI doesn't handle HEAD on GET routes by default and returns 405,
+# which causes Facebook to report "Bad Response Code". Treat HEAD as GET
+# and strip the body before sending.
+@app.middleware("http")
+async def head_as_get(request: Request, call_next):
+    if request.method != "HEAD":
+        return await call_next(request)
+    request.scope["method"] = "GET"
+    response = await call_next(request)
+    # Empty body but keep status + headers so Content-Length stays accurate.
+    from starlette.responses import Response as _R
+    return _R(status_code=response.status_code, headers=dict(response.headers))
+
+
 def _qs_no_sort(request: Request) -> str:
     """Current query string with the `sort` param stripped, urlencoded.
     Used by sort-link template macro so clicking a column preserves filters."""
