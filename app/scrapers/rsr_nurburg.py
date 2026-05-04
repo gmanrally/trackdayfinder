@@ -19,10 +19,10 @@ from ._base import RawEvent, UA
 SOURCE_SLUG = "rsr_nurburg"
 ORGANISER = "RSRNurburg"
 FEED_URL = "https://rsrbooking.com/events/populate"
-# RSR has no public per-event URL — clicks on the calendar are inert. The actual
-# booking flow is renting a car at /cars?date=DD-MM-YYYY (Ring laps) or
-# contacting them. We deep-link to the rental page filtered to the event date.
-BOOKING_URL = "https://rsrbooking.com/cars?date={date}"
+# RSR has no public per-event URL. /bookings/select-event is the entry point to
+# their booking wizard. The date param isn't read by their UI yet but we send it
+# anyway so the URL is self-describing and works if RSR ever adds support.
+BOOKING_URL = "https://rsrbooking.com/bookings/select-event?date={date}"
 DEBUG_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "debug"
 
 
