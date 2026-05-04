@@ -35,7 +35,9 @@
   </label>
   <label>Source
     <select name="source">
-      <option value="">All</option>
+      <option value="">All sources</option>
+      <option value="region-uk" {% if filters.source == 'region-uk' %}selected{% endif %}>All UK organisers</option>
+      <option value="region-eu" {% if filters.source == 'region-eu' %}selected{% endif %}>All European organisers</option>
       {% for group_label, items in sources_grouped %}
       <optgroup label="{{ group_label }}">
         {% for slug, name in items %}<option value="{{ slug }}" {% if slug == filters.source %}selected{% endif %}>{{ name }}</option>{% endfor %}

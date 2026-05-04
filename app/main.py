@@ -77,7 +77,12 @@ async def index(request: Request,
             q = q.where(Event.circuit == circuit)
         if vehicle:
             q = q.where(Event.vehicle_type == vehicle)
-        if source:
+        # Special region pseudo-sources from the dropdown
+        if source == "region-uk":
+            q = q.where(Event.region == "UK")
+        elif source == "region-eu":
+            q = q.where(Event.region == "EU")
+        elif source:
             q = q.where(Event.source == source)
         if session:
             q = q.where(Event.session == session)
