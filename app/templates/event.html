@@ -29,11 +29,43 @@
     {% if e.sold_out %}
       <span class="pill" style="background:#1f2937;color:#fff;font-size:14px;padding:6px 14px">Sold Out</span>
     {% else %}
-      <a class="book-btn" style="font-size:14px;padding:10px 20px" href="{{ e.booking_url }}" target="_blank" rel="noopener">Book on {{ e.organiser }} →</a>
+      <a class="book-btn" style="font-size:14px;padding:10px 20px" href="/go/{{ e.id }}" target="_blank" rel="noopener">Book on {{ e.organiser }} →</a>
     {% endif %}
   </p>
 
   {% if e.notes %}<p style="color:var(--muted);font-style:italic">{{ e.notes }}</p>{% endif %}
+
+  {% if history|length > 1 %}
+  <h2>Price history</h2>
+  <p style="color:var(--muted);font-size:13px">{{ history|length }} snapshots since we started tracking this event.</p>
+  <svg id="price-sparkline" width="100%" height="80" viewBox="0 0 600 80" preserveAspectRatio="none"
+       style="background:#fff;border:1px solid var(--line);border-radius:6px;padding:8px">
+    <polyline id="spark-line" fill="none" stroke="var(--accent)" stroke-width="2"/>
+  </svg>
+  <ul style="font-size:12px;color:var(--muted);columns:2;padding-left:18px">
+    {% for h in history %}<li>{{ h.at }}:
+      {%- if h.sold_out %} sold out
+      {%- elif h.price %} £{{ '%.0f' % h.price }}{% if h.spaces is not none %} · {{ h.spaces }} left{% endif %}
+      {%- else %} no price{% endif %}</li>{% endfor %}
+  </ul>
+  <script>
+    (function () {
+      const data = {{ history | tojson }};
+      const prices = data.filter(d => d.price).map(d => d.price);
+      if (prices.length < 2) return;
+      const min = Math.min(...prices), max = Math.max(...prices);
+      const range = (max - min) || 1;
+      const W = 600, H = 80, pad = 8;
+      const step = (W - pad*2) / (data.length - 1);
+      const pts = data.map((d, i) => {
+        const x = pad + i * step;
+        const y = H - pad - ((d.price || min) - min) / range * (H - pad*2);
+        return x + ',' + y;
+      }).join(' ');
+      document.getElementById('spark-line').setAttribute('points', pts);
+    })();
+  </script>
+  {% endif %}
 
   <h2>Other upcoming dates at {{ e.circuit }}</h2>
   {% if related %}

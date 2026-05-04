@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from .models import Event, ScrapeRun, init_db, session as db_session
+from .models import Event, ScrapeRun, Click, init_db, session as db_session
 from . import ingest
 
 BASE = Path(__file__).resolve().parent
@@ -131,6 +131,54 @@ def _qs_no_sort(request: Request) -> str:
     return urlencode(params)
 
 
+# Each "page" of the index is a 30-day window.
+INDEX_PAGE_DAYS = 30
+
+
+def _filtered_events_query(circuit, vehicle, source, session,
+                           from_, to, max_price, hide_sold_out, sort):
+    """Build a select(Event) with all user filters + the chosen sort applied.
+    Returns (query, sort_key) — caller handles execution."""
+    today = date.today()
+    q = select(Event).where(Event.event_date >= today)
+    if circuit:
+        q = q.where(Event.circuit == circuit)
+    if vehicle:
+        q = q.where(Event.vehicle_type == vehicle)
+    if source == "region-uk":
+        q = q.where(Event.region == "UK")
+    elif source == "region-eu":
+        q = q.where(Event.region == "EU")
+    elif source:
+        q = q.where(Event.source == source)
+    if session:
+        q = q.where(Event.session == session)
+    if from_:
+        try: q = q.where(Event.event_date >= date.fromisoformat(from_))
+        except ValueError: pass
+    if to:
+        try: q = q.where(Event.event_date <= date.fromisoformat(to))
+        except ValueError: pass
+    if max_price:
+        try: q = q.where(Event.price_gbp <= float(max_price))
+        except ValueError: pass
+    if hide_sold_out:
+        q = q.where(Event.sold_out == False)  # noqa: E712
+
+    from sqlmodel import asc, desc as sql_desc
+    sort_key = (sort or "date").lower()
+    if sort_key == "price":
+        q = q.order_by(Event.price_gbp.is_(None), asc(Event.price_gbp), Event.event_date)
+    elif sort_key == "price-desc":
+        q = q.order_by(Event.price_gbp.is_(None), sql_desc(Event.price_gbp), Event.event_date)
+    elif sort_key == "date-desc":
+        q = q.order_by(sql_desc(Event.event_date))
+    else:
+        sort_key = "date"
+        q = q.order_by(Event.event_date)
+    return q, sort_key
+
+
 @app.on_event("startup")
 async def _startup() -> None:
     init_db()
@@ -155,52 +203,34 @@ async def index(request: Request,
                 to: Optional[str] = None,
                 max_price: Optional[str] = None,
                 hide_sold_out: Optional[str] = None,
-                sort: Optional[str] = None):
+                sort: Optional[str] = None,
+                from_offset: Optional[str] = None):
+    today = date.today()
+    # `from_offset` is the JS pagination cursor — number of days from today
+    # where the visible window starts. Default 0 → show today .. today+30d.
+    try:
+        offset = max(0, int(from_offset or 0))
+    except ValueError:
+        offset = 0
+    win_start = today + timedelta(days=offset)
+    win_end   = win_start + timedelta(days=INDEX_PAGE_DAYS)
+
     with db_session() as s:
-        today = date.today()
-        q = select(Event).where(Event.event_date >= today)
-        if circuit:
-            q = q.where(Event.circuit == circuit)
-        if vehicle:
-            q = q.where(Event.vehicle_type == vehicle)
-        # Special region pseudo-sources from the dropdown
-        if source == "region-uk":
-            q = q.where(Event.region == "UK")
-        elif source == "region-eu":
-            q = q.where(Event.region == "EU")
-        elif source:
-            q = q.where(Event.source == source)
-        if session:
-            q = q.where(Event.session == session)
-        if from_:
-            try: q = q.where(Event.event_date >= date.fromisoformat(from_))
-            except ValueError: pass
-        if to:
-            try: q = q.where(Event.event_date <= date.fromisoformat(to))
-            except ValueError: pass
-        max_price_f: Optional[float] = None
-        if max_price:
-            try:
-                max_price_f = float(max_price)
-                q = q.where(Event.price_gbp <= max_price_f)
-            except ValueError:
-                pass
-        if hide_sold_out:
-            q = q.where(Event.sold_out == False)  # noqa: E712
-        # Sort: default by date asc; "price" = cheapest first (NULLs last);
-        # "price-desc" = priciest first; "date-desc" = furthest future first.
-        from sqlmodel import asc, desc as sql_desc
-        sort_key = (sort or "date").lower()
-        if sort_key == "price":
-            q = q.order_by(Event.price_gbp.is_(None), asc(Event.price_gbp), Event.event_date)
-        elif sort_key == "price-desc":
-            q = q.order_by(Event.price_gbp.is_(None), sql_desc(Event.price_gbp), Event.event_date)
-        elif sort_key == "date-desc":
-            q = q.order_by(sql_desc(Event.event_date))
-        else:
-            sort_key = "date"
-            q = q.order_by(Event.event_date)
-        events = s.exec(q).all()
+        q, sort_key = _filtered_events_query(circuit, vehicle, source, session,
+                                             from_, to, max_price, hide_sold_out, sort)
+        # Apply the 30-day pagination window on top of user filters.
+        windowed = q.where(Event.event_date < win_end, Event.event_date >= win_start)
+        events = s.exec(windowed).all()
+        # Total matching the user's filters (no pagination) — for the count pill.
+        from sqlmodel import func
+        total_count = s.exec(select(func.count()).select_from(q.subquery())).one()
+        if isinstance(total_count, tuple):
+            total_count = total_count[0]
+        # Are there more events past this window?
+        beyond = s.exec(q.where(Event.event_date >= win_end).limit(1)).first()
+        has_more = beyond is not None
+
+        all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
 
         all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
 
@@ -236,7 +266,10 @@ async def index(request: Request,
 
     return templates.TemplateResponse(request, "index.html", {
         "events": events,
-        "count": len(events),
+        "count": total_count,
+        "total_count": total_count,
+        "has_more": has_more,
+        "next_from": offset + INDEX_PAGE_DAYS,
         "circuits": circuits,
         "sources_grouped": sources_grouped,
         "sessions": sessions,
@@ -253,9 +286,49 @@ async def index(request: Request,
     })
 
 
+@app.get("/_chunk")
+async def index_chunk(request: Request,
+                      circuit: Optional[str] = None,
+                      vehicle: Optional[str] = None,
+                      source: Optional[str] = None,
+                      session: Optional[str] = None,
+                      from_: Optional[str] = None,
+                      to: Optional[str] = None,
+                      max_price: Optional[str] = None,
+                      hide_sold_out: Optional[str] = None,
+                      sort: Optional[str] = None,
+                      from_offset: Optional[str] = None):
+    """Returns rendered <tr>s for the next 30-day window, plus a has_more flag.
+    Used by the index page's infinite-scroll JS."""
+    today = date.today()
+    try:
+        offset = max(0, int(from_offset or 0))
+    except ValueError:
+        offset = 0
+    win_start = today + timedelta(days=offset)
+    win_end   = win_start + timedelta(days=INDEX_PAGE_DAYS)
+
+    with db_session() as s:
+        q, _ = _filtered_events_query(circuit, vehicle, source, session,
+                                      from_, to, max_price, hide_sold_out, sort)
+        events = s.exec(q.where(Event.event_date < win_end,
+                                Event.event_date >= win_start)).all()
+        beyond = s.exec(q.where(Event.event_date >= win_end).limit(1)).first()
+        has_more = beyond is not None
+
+    tmpl = templates.env.get_template("_event_row.html")
+    html = "".join(tmpl.render(e=ev, request=request) for ev in events)
+    return {
+        "html": html,
+        "has_more": has_more,
+        "next_from": offset + INDEX_PAGE_DAYS,
+    }
+
+
 @app.get("/trackday/{source}/{key}", response_class=HTMLResponse)
 async def event_detail(request: Request, source: str, key: str):
     """SEO-friendly per-event detail page."""
+    from .models import EventSnapshot
     today = date.today()
     with db_session() as s:
         e = s.exec(select(Event).where(Event.source == source, Event.dedup_key == key)).first()
@@ -267,8 +340,20 @@ async def event_detail(request: Request, source: str, key: str):
             .order_by(Event.event_date)
             .limit(8)
         ).all()
+        snapshots = s.exec(
+            select(EventSnapshot)
+            .where(EventSnapshot.event_id == e.id)
+            .order_by(EventSnapshot.captured_at)
+        ).all()
+    history = [
+        {"at": sn.captured_at.strftime("%d %b"),
+         "price": sn.price_gbp,
+         "spaces": sn.spaces_left,
+         "sold_out": sn.sold_out}
+        for sn in snapshots
+    ]
     return templates.TemplateResponse(request, "event.html", {
-        "e": e, "related": related, "now_year": today.year,
+        "e": e, "related": related, "history": history, "now_year": today.year,
     })
 
 
@@ -369,7 +454,7 @@ async def calendar_page(request: Request,
         events_json.append({
             "title": title,
             "start": e.event_date.isoformat(),
-            "url":   e.booking_url,
+            "url":   f"/go/{e.id}",
             "classNames": [c for c in klass.split() if c],
         })
 
@@ -484,7 +569,7 @@ async def map_page(request: Request,
                 "iso":  e.event_date.isoformat(),
                 "title": (e.title or "Trackday")[:60],
                 "organiser": e.organiser,
-                "url": e.booking_url,
+                "url": f"/go/{e.id}",
                 "sold_out": e.sold_out,
             })
     points = []                # circuits with upcoming matches — red numbered
@@ -558,6 +643,26 @@ async def robots():
         "Disallow: /api/\n"
         f"Sitemap: {CANONICAL_HOST}/sitemap.xml\n"
     )
+
+
+@app.get("/go/{event_id}")
+async def click_through(request: Request, event_id: int):
+    """Logged redirect to the organiser's booking page. Records click then 302s."""
+    from starlette.responses import RedirectResponse
+    with db_session() as s:
+        ev = s.exec(select(Event).where(Event.id == event_id)).first()
+        if not ev:
+            raise HTTPException(status_code=404, detail="Event not found")
+        s.add(Click(
+            event_id=event_id,
+            source=ev.source,
+            circuit=ev.circuit,
+            referrer=request.headers.get("referer"),
+            user_agent=(request.headers.get("user-agent") or "")[:200],
+        ))
+        s.commit()
+        target = ev.booking_url
+    return RedirectResponse(target, status_code=302)
 
 
 @app.get("/api/events")

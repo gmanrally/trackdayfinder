@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 from sqlmodel import select
-from .models import Event, ScrapeRun, init_db, session
+from .models import Event, ScrapeRun, EventSnapshot, init_db, session
 from .normalise import canonical_circuit, parse_price, parse_noise, make_dedup_key, to_gbp
 from .scrapers import SCRAPERS
 
@@ -25,6 +25,11 @@ async def run_one(slug: str) -> tuple[int, str | None]:
                 key = make_dedup_key(event_source, circuit, raw.event_date, raw.organiser,
                                      external_id=raw.external_id, session=raw.session)
                 existing = s.exec(select(Event).where(Event.dedup_key == key)).first()
+                # Snapshot the previous state BEFORE we overwrite it, so we can
+                # detect price/availability changes and store history.
+                prev = None
+                if existing:
+                    prev = (existing.price_gbp, existing.spaces_left, existing.sold_out)
                 ev = existing or Event(dedup_key=key, source=event_source, organiser=raw.organiser,
                                        circuit=circuit, circuit_raw=raw.circuit_raw,
                                        event_date=raw.event_date, booking_url=raw.booking_url)
@@ -50,6 +55,16 @@ async def run_one(slug: str) -> tuple[int, str | None]:
                 ev.region = raw.region or "UK"
                 ev.last_seen = datetime.utcnow()
                 s.add(ev)
+                s.flush()  # ensure ev.id available for snapshot
+                # Capture snapshot only when something changed (or first sight).
+                curr = (ev.price_gbp, ev.spaces_left, ev.sold_out)
+                if prev != curr:
+                    s.add(EventSnapshot(
+                        event_id=ev.id,
+                        price_gbp=ev.price_gbp,
+                        spaces_left=ev.spaces_left,
+                        sold_out=ev.sold_out,
+                    ))
                 n += 1
             s.commit()
         run.ok = True

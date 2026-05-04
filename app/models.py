@@ -49,6 +49,57 @@ class ScrapeRun(SQLModel, table=True):
     error: Optional[str] = None
 
 
+class EventSnapshot(SQLModel, table=True):
+    """Daily snapshot of an event's price + spaces, captured each ingest run.
+    Fuels the per-event price-history sparkline + future "price drop" alerts."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: int = Field(index=True)
+    captured_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    price_gbp: Optional[float] = None
+    spaces_left: Optional[int] = None
+    sold_out: bool = False
+
+
+class User(SQLModel, table=True):
+    """A subscriber to email alerts. Magic-link auth, no password."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, unique=True)
+    confirmed: bool = Field(default=False)
+    token: str = Field(index=True, unique=True)   # opaque secret for manage/unsub links
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_digest_at: Optional[datetime] = None
+
+
+class Watch(SQLModel, table=True):
+    """One thing a user wants alerts about: a circuit or an organiser source."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    kind: str = Field(index=True)         # "circuit" | "source"
+    value: str = Field(index=True)        # e.g. "Donington Park" or "javelin"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class AlertSent(SQLModel, table=True):
+    """Dedup: once we tell user X about event Y, don't tell them again
+    (unless price changes — recorded as a separate kind)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    event_id: int = Field(index=True)
+    kind: str = Field(index=True)         # "new" | "price_drop" | "reopened" | "low_stock"
+    sent_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Click(SQLModel, table=True):
+    """Each Book-button click — fed by the /go/<event_id> redirect."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: int = Field(index=True)                # Event.id
+    source: str = Field(index=True)                  # denormalised for fast group-by
+    circuit: str = Field(index=True)
+    clicked_at: datetime = Field(default_factory=datetime.utcnow)
+    referrer: Optional[str] = None
+    user_agent: Optional[str] = None
+
+
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
 

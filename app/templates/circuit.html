@@ -34,7 +34,7 @@
           {%- elif e.spaces_left is not none -%}<span class="pill" style="background:{% if e.spaces_left <= 3 %}#dc2626;color:#fff{% else %}#fef3c7;color:#92400e{% endif %}">{{ e.spaces_left }} left</span>
           {%- elif e.stock_status -%}<span class="pill" style="background:#fef3c7;color:#92400e">{{ e.stock_status }}</span>{%- endif -%}
         </td>
-        <td data-label="Book"><a class="book-btn" href="{{ e.booking_url }}" target="_blank" rel="noopener">Book →</a></td>
+        <td data-label="Book"><a class="book-btn" href="/go/{{ e.id }}" target="_blank" rel="noopener">Book →</a></td>
       </tr>
     {% endfor %}
     </tbody>
