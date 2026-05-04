@@ -1,0 +1,58 @@
+{% extends "_base.html" %}
+
+{% block title %}{{ organiser_name }} Trackdays — {{ events|length }} upcoming dates | TrackdayFinder.co.uk{% endblock %}
+{% block meta_description %}All upcoming trackdays from {{ organiser_name }} across {{ circuits|length }} UK circuits. Compare dates, prices and availability in one place.{% endblock %}
+
+{% block crumbs %}
+<nav class="crumbs"><a href="/">Home</a> &rsaquo; {{ organiser_name }}</nav>
+{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>{{ organiser_name }} trackdays</h1>
+  <p class="lede">{{ events|length }} upcoming {{ 'date' if events|length == 1 else 'dates' }} from {{ organiser_name }}, across {{ circuits|length }} {{ 'circuit' if circuits|length == 1 else 'circuits' }}.</p>
+
+  {% if events %}
+  <div class="table-scroll">
+  <table>
+    <thead><tr>
+      <th>Date</th><th>Circuit</th><th>Title</th><th>Vehicle</th><th>Session</th>
+      <th>Noise</th><th class="right">Price</th><th>Stock</th><th>Book</th>
+    </tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr class="{% if e.sold_out %}soldout{% endif %}">
+        <td><a href="/trackday/{{ e.source }}/{{ e.dedup_key }}">{{ e.event_date.strftime('%a %d %b %Y') }}</a></td>
+        <td><a href="/circuit/{{ e.circuit | slugify }}">{{ e.circuit }}</a></td>
+        <td>{{ e.title or '' }}</td>
+        <td>{{ e.vehicle_type or '' }}</td>
+        <td>{{ e.session or '' }}</td>
+        <td>{{ e.noise_limit_db ~ ' dB' if e.noise_limit_db else '' }}</td>
+        <td class="right">{{ '£%.0f' % e.price_gbp if e.price_gbp else '' }}</td>
+        <td>
+          {%- if e.sold_out -%}<span class="pill" style="background:#1f2937;color:#fff">Sold out</span>
+          {%- elif e.spaces_left is not none -%}<span class="pill" style="background:{% if e.spaces_left <= 3 %}#dc2626;color:#fff{% else %}#fef3c7;color:#92400e{% endif %}">{{ e.spaces_left }} left</span>
+          {%- elif e.stock_status -%}<span class="pill" style="background:#fef3c7;color:#92400e">{{ e.stock_status }}</span>{%- endif -%}
+        </td>
+        <td><a class="book-btn" href="{{ e.booking_url }}" target="_blank" rel="noopener">Book →</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>No upcoming trackdays listed for {{ organiser_name }} right now.</p>
+  {% endif %}
+</article>
+{% endblock %}
+
+{% block jsonld %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "{{ organiser_name | e }}",
+  "url": "https://trackdayfinder.co.uk/organiser/{{ source }}"
+}
+</script>
+{% endblock %}

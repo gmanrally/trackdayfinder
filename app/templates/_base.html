@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}TrackdayFinder.co.uk — UK Trackday Calendar & Booking Search{% endblock %}</title>
+<meta name="description" content="{% block meta_description %}Find every UK trackday in one place. Search 13 organisers (MSV, Javelin, OpenTrack, Silverstone, Goodwood and more) by circuit, date, price and availability.{% endblock %}">
+<link rel="canonical" href="{% block canonical %}https://trackdayfinder.co.uk{{ request.url.path }}{% endblock %}">
+
+<!-- OpenGraph / Twitter -->
+<meta property="og:site_name" content="TrackdayFinder.co.uk">
+<meta property="og:type" content="{% block og_type %}website{% endblock %}">
+<meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
+<meta property="og:description" content="{% block og_description %}{{ self.meta_description() }}{% endblock %}">
+<meta property="og:url" content="{% block og_url %}{{ self.canonical() }}{% endblock %}">
+<meta property="og:image" content="{% block og_image %}https://trackdayfinder.co.uk/static/logo-light-on-dark.svg{% endblock %}">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" type="image/svg+xml" href="/static/logo-square.svg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+{% block head_extra %}{% endblock %}
+
+<style>
+  :root {
+    --fg:#0f172a;
+    --muted:#64748b;
+    --muted-2:#94a3b8;
+    --bg:#f1f5f9;
+    --card:#ffffff;
+    --line:#e2e8f0;
+    --line-2:#cbd5e1;
+    --accent:#dc2626;
+    --accent-2:#b91c1c;
+    --hi-bg:#fef2f2;
+    --header-bg:#0b1220;
+    --header-fg:#f8fafc;
+    --pill-bg:#eef2ff;
+    --pill-fg:#3730a3;
+    --shadow-sm: 0 1px 2px rgba(15,23,42,0.05);
+    --shadow:    0 4px 12px rgba(15,23,42,0.06);
+    --radius: 8px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { height:100%; }
+  body {
+    font: 14px/1.5 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    color: var(--fg); background: var(--bg); margin: 0;
+    display: flex; flex-direction: column; min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  header {
+    padding: 14px 24px;
+    background: linear-gradient(180deg, #0b1220 0%, #111a2e 100%);
+    color: var(--header-fg);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 30; flex: 0 0 auto;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.05), 0 6px 20px rgba(0,0,0,0.25);
+  }
+  .brand-block { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+  .brand-block .brand-link { align-self: flex-start; }
+  .brand-block .tagline { padding-right: 4px; line-height: 1.1; }
+  header .meta { margin-left: auto; }
+  header h1 { font-size: 26px; font-weight: 700; margin: 0; color: #ffffff; letter-spacing: -0.015em; }
+  .brand-link { display: inline-flex; align-items: center; line-height: 0; }
+  .brand-logo { height: 44px; width: auto; display: block; }
+  @media (max-width: 640px) { .brand-logo { height: 34px; } }
+  header .tagline { color: #94a3b8; font-size: 13px; }
+  header .tagline a { color: #f8fafc; text-decoration: none; border-bottom: 1px dashed #475569; }
+  header .tagline a:hover { color: #fff; border-color: #fff; }
+  .brand-gmracing { font-weight: 600; color: #ffffff; text-decoration: none; }
+  .brand-gmracing .brand-r { color: var(--accent) !important; font: inherit; font-weight: inherit; letter-spacing: inherit; }
+  header .brand-gmracing .brand-r { color: #ffffff !important; }
+  footer .brand-gmracing { color: #1f2937 !important; }
+  footer .brand-gmracing:hover { text-decoration: underline; }
+  header .meta {
+    color: #94a3b8; font-size: 12px; margin-left: auto;
+    background: rgba(255,255,255,0.04); padding: 6px 12px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  /* Sub-nav breadcrumb */
+  nav.crumbs {
+    padding: 10px 24px; background: #fff; border-bottom: 1px solid var(--line);
+    font-size: 13px; color: var(--muted);
+  }
+  nav.crumbs a { color: var(--accent); text-decoration: none; }
+  nav.crumbs a:hover { text-decoration: underline; }
+
+  /* Filters bar */
+  form.filters {
+    padding: 14px 24px; background: var(--card);
+    border-bottom: 1px solid var(--line);
+    display: flex; flex-wrap: nowrap; gap: 14px; align-items: end;
+    overflow-x: auto;
+    position: sticky; top: 0; z-index: 20; flex: 0 0 auto;
+    box-shadow: var(--shadow-sm);
+  }
+  form.filters > * { flex: 0 0 auto; }
+  form.filters label {
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 11px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  form.filters label:has(input[type=checkbox]) {
+    flex-direction: row; align-items: center; gap: 6px;
+    text-transform: none; letter-spacing: 0; font-weight: 500;
+    font-size: 13px; color: var(--fg);
+  }
+  form.filters input, form.filters select {
+    padding: 7px 10px; font: 14px 'Inter', system-ui, sans-serif;
+    color: var(--fg); background: #fff;
+    border: 1px solid var(--line-2); border-radius: 6px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  form.filters input:focus, form.filters select:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(220,38,38,0.15);
+  }
+  form.filters input[type=checkbox] { width: 16px; height: 16px; padding: 0; accent-color: var(--accent); }
+  form.filters button {
+    padding: 8px 16px; font-weight: 600;
+    background: var(--accent); color: #fff;
+    border: 0; border-radius: 6px; cursor: pointer;
+    transition: background .15s, transform .05s, border-color .15s;
+    box-shadow: var(--shadow-sm);
+  }
+  form.filters button:hover { background: var(--accent-2); }
+  form.filters button:active { transform: translateY(1px); }
+  form.filters button.btn-clear { background: #fff; color: var(--fg); border: 1px solid var(--line-2); }
+  form.filters button.btn-clear:hover { background: #f8fafc; border-color: var(--accent); color: var(--accent); }
+
+  /* Article (event/circuit/organiser pages) */
+  .page {
+    flex: 1 1 auto; overflow-y: auto;
+    padding: 28px 24px 60px; max-width: 1080px; width: 100%; margin: 0 auto;
+  }
+  .page h1 { font-size: 32px; font-weight: 800; letter-spacing: -0.02em; margin: 0 0 6px; }
+  .page h2 { font-size: 20px; font-weight: 700; margin: 28px 0 12px; }
+  .page .lede { color: var(--muted); font-size: 16px; margin: 0 0 24px; }
+  .page p { margin: 0 0 12px; }
+  .page a { color: var(--accent); text-decoration: none; }
+  .page a:hover { text-decoration: underline; }
+
+  /* Table (used in index + listing pages) */
+  .table-scroll { flex: 1 1 auto; overflow: auto; background: var(--card); }
+  .page .table-scroll { flex: 0 0 auto; max-width: none; }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--card); }
+  thead th {
+    position: sticky; top: 0; z-index: 10;
+    background: #1f2937; color: #f1f5f9;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+    padding: 11px 14px; text-align: left;
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid #374151;
+    box-shadow: 0 2px 6px rgba(15,23,42,0.12);
+    white-space: nowrap;
+  }
+  thead th:last-child { border-right: none; }
+  thead th a { color: inherit; text-decoration: none; }
+  thead th a:hover { color: var(--accent); }
+  tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  tbody td:last-child { border-right: none; }
+  tbody tr:nth-child(odd)  td { background: #ffffff; }
+  tbody tr:nth-child(even) td { background: #f1f5f9; }
+  tbody tr:hover td { background: var(--hi-bg); }
+  tbody tr:last-child td { border-bottom: none; }
+  tr.soldout td { opacity: 0.45; text-decoration: line-through; }
+  td.right { text-align: right; }
+  td a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  td a:hover { text-decoration: underline; }
+  .book-btn {
+    display: inline-block; padding: 6px 14px;
+    background: var(--accent); color: #fff !important;
+    font-size: 12px; font-weight: 600;
+    border-radius: 6px; text-decoration: none !important;
+    transition: background .15s, transform .05s;
+    box-shadow: var(--shadow-sm); white-space: nowrap;
+  }
+  .book-btn:hover { background: var(--accent-2); }
+  .book-btn:active { transform: translateY(1px); }
+  tr.soldout .book-btn { background: var(--muted-2); pointer-events: none; }
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    background: var(--pill-bg); color: var(--pill-fg);
+    font-size: 11px; font-weight: 600; letter-spacing: 0.02em;
+    text-transform: capitalize; line-height: 1.4;
+  }
+  .empty { padding: 60px 20px; text-align: center; color: var(--muted); font-size: 14px; background: var(--card); }
+
+  /* Stat row (event detail page) */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin: 18px 0 28px; }
+  .stat { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-value { font-size: 22px; font-weight: 700; color: var(--fg); margin-top: 4px; }
+
+  /* Cards grid (circuit/organiser landing extras) */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .card-link {
+    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px; display: block; text-decoration: none !important;
+    transition: border-color .15s, transform .05s, box-shadow .15s;
+  }
+  .card-link:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+  .card-title { font-weight: 700; color: var(--fg); }
+  .card-meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  footer { flex: 0 0 auto; }
+  footer a { color: var(--accent) !important; text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  @media (max-width: 640px) {
+    header { padding: 12px 16px; }
+    header .tagline { font-size: 11px; flex-basis: 100%; margin: 0; }
+    header .meta { font-size: 11px; }
+    form.filters { padding: 12px 16px; gap: 10px; }
+    thead th, tbody td { padding: 8px 10px; font-size: 12px; }
+    .page { padding: 18px 14px 40px; }
+    .page h1 { font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand-block">
+    <a href="/" class="brand-link" aria-label="TrackdayFinder home">
+      <img src="/static/logo-light.svg" alt="TrackdayFinder" class="brand-logo">
+    </a>
+    <span class="tagline">kindly provided by
+      <a class="brand-gmracing" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a>
+    </span>
+  </div>
+  {% block header_meta %}{% endblock %}
+</header>
+
+{% block crumbs %}{% endblock %}
+
+{% block content %}{% endblock %}
+
+<footer style="text-align:center;padding:10px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;background:var(--card)">
+  &copy; {{ now_year }} <a class="brand-gmracing brand-gmracing-dark" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a> &middot; All rights reserved.
+  Listings aggregated from public organiser sites; bookings handled by the respective organisers.
+</footer>
+
+{% block jsonld %}{% endblock %}
+</body>
+</html>

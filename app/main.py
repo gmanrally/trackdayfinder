@@ -3,8 +3,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+import re
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
@@ -14,7 +15,19 @@ from .models import Event, ScrapeRun, init_db, session as db_session
 from . import ingest
 
 BASE = Path(__file__).resolve().parent
+
+CANONICAL_HOST = "https://trackdayfinder.co.uk"
+
+
+def slugify(s: str) -> str:
+    """Convert a circuit / organiser name to a URL slug."""
+    s = (s or "").lower().strip()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return s.strip("-")
+
+
 templates = Jinja2Templates(directory=str(BASE / "templates"))
+templates.env.filters["slugify"] = slugify
 
 app = FastAPI(title="TrackdayFinder")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
@@ -125,6 +138,100 @@ async def index(request: Request,
             "hide_sold_out": bool(hide_sold_out),
         },
     })
+
+
+@app.get("/trackday/{source}/{key}", response_class=HTMLResponse)
+async def event_detail(request: Request, source: str, key: str):
+    """SEO-friendly per-event detail page."""
+    today = date.today()
+    with db_session() as s:
+        e = s.exec(select(Event).where(Event.source == source, Event.dedup_key == key)).first()
+        if not e:
+            raise HTTPException(status_code=404, detail="Event not found")
+        related = s.exec(
+            select(Event)
+            .where(Event.circuit == e.circuit, Event.event_date >= today, Event.dedup_key != key)
+            .order_by(Event.event_date)
+            .limit(8)
+        ).all()
+    return templates.TemplateResponse(request, "event.html", {
+        "e": e, "related": related, "now_year": today.year,
+    })
+
+
+@app.get("/circuit/{slug}", response_class=HTMLResponse)
+async def circuit_page(request: Request, slug: str):
+    """SEO landing page for one circuit — all upcoming dates there."""
+    today = date.today()
+    with db_session() as s:
+        all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
+    matching = [e for e in all_events if slugify(e.circuit) == slug]
+    if not matching:
+        raise HTTPException(status_code=404, detail="Circuit not found")
+    matching.sort(key=lambda e: e.event_date)
+    organisers = sorted({e.organiser for e in matching})
+    return templates.TemplateResponse(request, "circuit.html", {
+        "circuit": matching[0].circuit,
+        "events": matching,
+        "organisers": organisers,
+        "now_year": today.year,
+    })
+
+
+@app.get("/organiser/{source}", response_class=HTMLResponse)
+async def organiser_page(request: Request, source: str):
+    """SEO landing page for one organiser — all their upcoming events."""
+    from .scrapers import ORGANISER_DISPLAY
+    today = date.today()
+    with db_session() as s:
+        events = s.exec(
+            select(Event).where(Event.source == source, Event.event_date >= today)
+            .order_by(Event.event_date)
+        ).all()
+    if not events:
+        raise HTTPException(status_code=404, detail="Organiser not found")
+    circuits = sorted({e.circuit for e in events})
+    return templates.TemplateResponse(request, "organiser.html", {
+        "source": source,
+        "organiser_name": ORGANISER_DISPLAY.get(source, source.title()),
+        "events": events,
+        "circuits": circuits,
+        "now_year": today.year,
+    })
+
+
+@app.get("/sitemap.xml")
+async def sitemap():
+    today = date.today()
+    with db_session() as s:
+        events = s.exec(select(Event).where(Event.event_date >= today)).all()
+    organisers = sorted({e.source for e in events})
+    circuits = sorted({slugify(e.circuit) for e in events})
+
+    urls = [(f"{CANONICAL_HOST}/", "1.0", "daily")]
+    for src in organisers:
+        urls.append((f"{CANONICAL_HOST}/organiser/{src}", "0.7", "daily"))
+    for c in circuits:
+        urls.append((f"{CANONICAL_HOST}/circuit/{c}", "0.8", "daily"))
+    for e in events:
+        urls.append((f"{CANONICAL_HOST}/trackday/{e.source}/{e.dedup_key}", "0.6", "weekly"))
+
+    body = ['<?xml version="1.0" encoding="UTF-8"?>',
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
+    for loc, prio, freq in urls:
+        body.append(f"<url><loc>{loc}</loc><changefreq>{freq}</changefreq><priority>{prio}</priority></url>")
+    body.append("</urlset>")
+    return Response("\n".join(body), media_type="application/xml")
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+async def robots():
+    return (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/\n"
+        f"Sitemap: {CANONICAL_HOST}/sitemap.xml\n"
+    )
 
 
 @app.get("/api/events")

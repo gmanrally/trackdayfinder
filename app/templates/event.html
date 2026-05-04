@@ -1,0 +1,85 @@
+{% extends "_base.html" %}
+
+{% set ev_title = (e.title or (e.circuit ~ ' Trackday')) %}
+{% block title %}{{ ev_title }} — {{ e.event_date.strftime('%a %d %b %Y') }} | {{ e.organiser }} | TrackdayFinder.co.uk{% endblock %}
+{% block meta_description %}{{ ev_title }} on {{ e.event_date.strftime('%A %d %B %Y') }} at {{ e.circuit }} with {{ e.organiser }}.{% if e.price_gbp %} Priced from £{{ '%.0f' % e.price_gbp }}.{% endif %}{% if e.noise_limit_db %} Noise limit {{ e.noise_limit_db }}dB.{% endif %} Book direct via the organiser.{% endblock %}
+{% block og_type %}event{% endblock %}
+
+{% block crumbs %}
+<nav class="crumbs"><a href="/">Home</a> &rsaquo; <a href="/circuit/{{ e.circuit | slugify }}">{{ e.circuit }}</a> &rsaquo; {{ e.event_date.strftime('%d %b %Y') }}</nav>
+{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>{{ ev_title }}</h1>
+  <p class="lede">{{ e.event_date.strftime('%A %d %B %Y') }} at <a href="/circuit/{{ e.circuit | slugify }}">{{ e.circuit }}</a> with <a href="/organiser/{{ e.source }}">{{ e.organiser }}</a>.</p>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Date</div><div class="stat-value">{{ e.event_date.strftime('%d %b %Y') }}</div></div>
+    <div class="stat"><div class="stat-label">Circuit</div><div class="stat-value" style="font-size:18px">{{ e.circuit }}</div></div>
+    {% if e.vehicle_type %}<div class="stat"><div class="stat-label">Vehicle</div><div class="stat-value" style="font-size:18px;text-transform:capitalize">{{ e.vehicle_type }}</div></div>{% endif %}
+    {% if e.session %}<div class="stat"><div class="stat-label">Session</div><div class="stat-value" style="font-size:18px;text-transform:capitalize">{{ e.session }}</div></div>{% endif %}
+    {% if e.price_gbp %}<div class="stat"><div class="stat-label">Price from</div><div class="stat-value">£{{ '%.0f' % e.price_gbp }}</div></div>{% endif %}
+    {% if e.noise_limit_db %}<div class="stat"><div class="stat-label">Noise limit</div><div class="stat-value">{{ e.noise_limit_db }} dB</div></div>{% endif %}
+    {% if e.spaces_left is not none %}<div class="stat"><div class="stat-label">Spaces left</div><div class="stat-value" style="color:{% if e.spaces_left <= 3 %}var(--accent){% endif %}">{{ e.spaces_left }}</div></div>
+    {% elif e.stock_status %}<div class="stat"><div class="stat-label">Availability</div><div class="stat-value" style="font-size:16px">{{ e.stock_status }}</div></div>{% endif %}
+  </div>
+
+  <p>
+    {% if e.sold_out %}
+      <span class="pill" style="background:#1f2937;color:#fff;font-size:14px;padding:6px 14px">Sold Out</span>
+    {% else %}
+      <a class="book-btn" style="font-size:14px;padding:10px 20px" href="{{ e.booking_url }}" target="_blank" rel="noopener">Book on {{ e.organiser }} →</a>
+    {% endif %}
+  </p>
+
+  {% if e.notes %}<p style="color:var(--muted);font-style:italic">{{ e.notes }}</p>{% endif %}
+
+  <h2>Other upcoming dates at {{ e.circuit }}</h2>
+  {% if related %}
+  <div class="card-grid">
+    {% for r in related %}
+    <a class="card-link" href="/trackday/{{ r.source }}/{{ r.dedup_key }}">
+      <div class="card-title">{{ r.event_date.strftime('%a %d %b %Y') }}</div>
+      <div class="card-meta">{{ r.organiser }}{% if r.price_gbp %} · from £{{ '%.0f' % r.price_gbp }}{% endif %}</div>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p style="color:var(--muted)">No other upcoming dates at this circuit.</p>
+  {% endif %}
+</article>
+{% endblock %}
+
+{% block jsonld %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": "{{ ev_title | e }}",
+  "startDate": "{{ e.event_date.isoformat() }}",
+  "endDate": "{{ e.event_date.isoformat() }}",
+  "eventStatus": "https://schema.org/{{ 'EventCancelled' if e.sold_out else 'EventScheduled' }}",
+  "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+  "location": {
+    "@type": "Place",
+    "name": "{{ e.circuit | e }}",
+    "address": "United Kingdom"
+  },
+  "organizer": {
+    "@type": "Organization",
+    "name": "{{ e.organiser | e }}",
+    "url": "{{ e.booking_url | e }}"
+  },
+  {% if e.price_gbp %}"offers": {
+    "@type": "Offer",
+    "price": "{{ '%.2f' % e.price_gbp }}",
+    "priceCurrency": "GBP",
+    "url": "{{ e.booking_url | e }}",
+    "availability": "https://schema.org/{{ 'SoldOut' if e.sold_out else 'InStock' }}"
+  },{% endif %}
+  "url": "https://trackdayfinder.co.uk/trackday/{{ e.source }}/{{ e.dedup_key }}",
+  "description": "{{ ev_title | e }} on {{ e.event_date.strftime('%A %d %B %Y') }} at {{ e.circuit | e }} with {{ e.organiser | e }}."
+}
+</script>
+{% endblock %}
