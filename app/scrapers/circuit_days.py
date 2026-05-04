@@ -43,6 +43,13 @@ def _parse(card) -> Optional[RawEvent]:
     if not title_node or not date_node:
         return None
     circuit = title_node.text(strip=True)
+    # Skip Circuit Days road-trip products (Alpine Grand Tour, California Run, etc.)
+    low = circuit.lower()
+    if any(k in low for k in (
+        "grand tour", "california", "road tour", "road trip", "iceland",
+        "alpine", "norway",
+    )):
+        return None
 
     m = DATE_RE.search(date_node.text(strip=True))
     if not m:

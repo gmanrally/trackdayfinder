@@ -64,6 +64,13 @@ def _parse_row(tr: Node, year: int, month_hint: int) -> Optional[RawEvent]:
         return None
     link = title_td.css_first("a")
     title = link.text(strip=True) if link else title_td.text(strip=True)
+    # Skip RMA's multi-day road-trip packages — they're not trackdays.
+    low = title.lower()
+    if any(k in low for k in (
+        "grand tour", "california", "arctic", "road trip", "iceland",
+        "alps", "alpine", "norway", "scotland tour",
+    )):
+        return None
     href = link.attributes.get("href", "") if link else ""
     if href.startswith("/"):
         href = "https://www.rmatrackdays.com" + href

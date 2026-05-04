@@ -60,14 +60,11 @@ def _qs_no_sort(request: Request) -> str:
 @app.on_event("startup")
 async def _startup() -> None:
     init_db()
-    import asyncio, os
-    # If DB is empty, kick off an initial scrape in the BACKGROUND so the
-    # web server starts serving immediately (otherwise nginx returns 502 for
-    # the ~60s the scrape takes).
-    with db_session() as s:
-        if not s.exec(select(Event)).first():
-            asyncio.create_task(ingest.run_all())
-    # Nightly refresh at 03:00 local time (TZ from container env / OS).
+    import os
+    # No auto-scrape on boot — startup tasks silently swallow exceptions which
+    # made debugging painful. Population is handled by the nightly in-process
+    # cron below + the host-side cron at /etc/cron.d/trackdayfinder-refresh,
+    # plus an explicit `python -m app.cli refresh` for first-boot or on demand.
     hour = int(os.environ.get("TRACKDAYFINDER_REFRESH_HOUR", "3"))
     minute = int(os.environ.get("TRACKDAYFINDER_REFRESH_MINUTE", "0"))
     scheduler.add_job(ingest.run_all, "cron", hour=hour, minute=minute, id="refresh")

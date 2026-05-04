@@ -72,6 +72,13 @@
     transition: background .15s, border-color .15s;
   }
   header nav.top-nav a:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
+  header .report-link {
+    color: #fbbf24; text-decoration: none; font-size: 12px; font-weight: 600;
+    padding: 5px 10px; border-radius: 6px;
+    border: 1px dashed rgba(251, 191, 36, 0.5);
+    transition: background .15s, border-color .15s;
+  }
+  header .report-link:hover { background: rgba(251,191,36,0.12); border-color: #fbbf24; }
   header h1 { font-size: 26px; font-weight: 700; margin: 0; color: #ffffff; letter-spacing: -0.015em; }
   .brand-link { display: inline-flex; align-items: center; line-height: 0; }
   .brand-logo { height: 44px; width: auto; display: block; }
@@ -312,6 +319,10 @@
   </nav>
   {% set _gm = global_meta() %}
   <span class="meta">{{ _gm.count }} events · last refresh {{ _gm.last_run or "never" }}</span>
+  <a class="report-link" href="mailto:youmissedone@trackdayfinder.co.uk?subject=Missing%20event%20or%20circuit"
+     title="Spotted a missing event, circuit or bug? Email us.">
+    Missing something?
+  </a>
 </header>
 
 {% block crumbs %}{% endblock %}
