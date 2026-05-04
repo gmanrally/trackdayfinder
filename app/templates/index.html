@@ -45,11 +45,12 @@
     padding: 14px 24px;
     background: linear-gradient(180deg, #0b1220 0%, #111a2e 100%);
     color: var(--header-fg);
-    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
     position: sticky; top: 0; z-index: 30; flex: 0 0 auto;
     box-shadow: 0 1px 0 rgba(255,255,255,0.05), 0 6px 20px rgba(0,0,0,0.25);
   }
-  header .meta { align-self: center; }
+  header .tagline { margin-left: 4px; }   /* sits flush next to the logo */
+  header .meta    { margin-left: auto; }  /* pushed to far right */
   header h1 {
     font-size: 26px; font-weight: 700; margin: 0;
     color: #ffffff; letter-spacing: -0.015em;
