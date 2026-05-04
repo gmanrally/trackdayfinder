@@ -217,14 +217,72 @@
   footer { flex: 0 0 auto; }
   footer a { color: var(--accent) !important; text-decoration: none; }
   footer a:hover { text-decoration: underline; }
-  @media (max-width: 640px) {
-    header { padding: 12px 16px; }
-    header .tagline { font-size: 11px; flex-basis: 100%; margin: 0; }
-    header .meta { font-size: 11px; }
-    form.filters { padding: 12px 16px; gap: 10px; }
-    thead th, tbody td { padding: 8px 10px; font-size: 12px; }
+  /* ============ Mobile (≤ 720px): table becomes a card list ============ */
+  @media (max-width: 720px) {
+    header { padding: 10px 14px; gap: 8px; }
+    header .meta { font-size: 11px; padding: 4px 9px; }
+    .brand-logo { height: 32px; }
+    .brand-block .tagline { font-size: 11px; padding-right: 2px; }
+
+    /* Filter bar: allow wrapping instead of horizontal scroll, smaller font. */
+    form.filters {
+      padding: 10px 12px; gap: 8px 10px;
+      flex-wrap: wrap; overflow-x: visible;
+    }
+    form.filters label { font-size: 10px; gap: 2px; }
+    form.filters input, form.filters select { font-size: 13px; padding: 6px 8px; }
+    form.filters button { padding: 7px 12px; font-size: 13px; }
+
+    /* Table -> stacked cards. Each <tr> is a card, each <td> is a row inside
+       it with a "Label: value" layout (label comes from data-label attr). */
+    .table-scroll { overflow: visible; padding: 8px; background: var(--bg); }
+    table, thead, tbody, tr, td { display: block; width: 100%; }
+    thead { display: none; }                /* column headers hidden on mobile */
+    tbody tr {
+      background: #fff !important;
+      border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 10px 12px; margin-bottom: 10px;
+      box-shadow: var(--shadow-sm);
+    }
+    tbody tr:nth-child(odd) td, tbody tr:nth-child(even) td { background: transparent; }
+    tbody tr:hover td { background: transparent; }
+    tbody td {
+      padding: 4px 0; border: 0; border-bottom: 1px dashed var(--line);
+      display: flex; gap: 10px; align-items: baseline;
+      font-size: 13px; line-height: 1.35;
+    }
+    tbody td:last-child { border-bottom: 0; padding-top: 8px; }
+    tbody td::before {
+      content: attr(data-label);
+      flex: 0 0 88px;
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    tbody td:empty,
+    tbody td:has(> :only-child:empty),
+    tbody td.right.empty { display: none; }
+    tbody td.right { justify-content: flex-start; text-align: left; }
+
+    /* Date row: emphasise it as a header on the card. */
+    tbody td[data-label='Date']::before { display: none; }
+    tbody td[data-label='Date'] {
+      font-weight: 700; font-size: 14px;
+      color: var(--fg); padding-bottom: 8px;
+    }
+    tbody td[data-label='Date'] a { color: var(--fg); }
+
+    /* Book button: full width and prominent. */
+    tbody td[data-label='Book']::before { display: none; }
+    tbody td[data-label='Book'] { padding-top: 10px; }
+    .book-btn { width: 100%; text-align: center; padding: 10px 14px; font-size: 14px; }
+
     .page { padding: 18px 14px 40px; }
     .page h1 { font-size: 24px; }
+  }
+
+  /* Hide TBODY cells that have no value on mobile (keep desktop behaviour). */
+  @media (max-width: 720px) {
+    tbody td.is-empty { display: none; }
   }
 </style>
 </head>

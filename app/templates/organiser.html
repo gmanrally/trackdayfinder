@@ -22,19 +22,19 @@
     <tbody>
     {% for e in events %}
       <tr class="{% if e.sold_out %}soldout{% endif %}">
-        <td><a href="/trackday/{{ e.source }}/{{ e.dedup_key }}">{{ e.event_date.strftime('%a %d %b %Y') }}</a></td>
-        <td><a href="/circuit/{{ e.circuit | slugify }}">{{ e.circuit }}</a></td>
-        <td>{{ e.title or '' }}</td>
-        <td>{{ e.vehicle_type or '' }}</td>
-        <td>{{ e.session or '' }}</td>
-        <td>{{ e.noise_limit_db ~ ' dB' if e.noise_limit_db else '' }}</td>
-        <td class="right">{{ '£%.0f' % e.price_gbp if e.price_gbp else '' }}</td>
-        <td>
+        <td data-label="Date"><a href="/trackday/{{ e.source }}/{{ e.dedup_key }}">{{ e.event_date.strftime('%a %d %b %Y') }}</a></td>
+        <td data-label="Circuit"><a href="/circuit/{{ e.circuit | slugify }}">{{ e.circuit }}</a></td>
+        <td data-label="Title">{{ e.title or '' }}</td>
+        <td data-label="Vehicle" {% if not e.vehicle_type %}class="is-empty"{% endif %}>{{ e.vehicle_type or '' }}</td>
+        <td data-label="Session" {% if not e.session %}class="is-empty"{% endif %}>{{ e.session or '' }}</td>
+        <td data-label="Noise" {% if not e.noise_limit_db %}class="is-empty"{% endif %}>{{ e.noise_limit_db ~ ' dB' if e.noise_limit_db else '' }}</td>
+        <td data-label="Price" class="right{% if not e.price_gbp %} is-empty{% endif %}">{{ '£%.0f' % e.price_gbp if e.price_gbp else '' }}</td>
+        <td data-label="Stock" {% if not (e.sold_out or e.spaces_left is not none or e.stock_status) %}class="is-empty"{% endif %}>
           {%- if e.sold_out -%}<span class="pill" style="background:#1f2937;color:#fff">Sold out</span>
           {%- elif e.spaces_left is not none -%}<span class="pill" style="background:{% if e.spaces_left <= 3 %}#dc2626;color:#fff{% else %}#fef3c7;color:#92400e{% endif %}">{{ e.spaces_left }} left</span>
           {%- elif e.stock_status -%}<span class="pill" style="background:#fef3c7;color:#92400e">{{ e.stock_status }}</span>{%- endif -%}
         </td>
-        <td><a class="book-btn" href="{{ e.booking_url }}" target="_blank" rel="noopener">Book →</a></td>
+        <td data-label="Book"><a class="book-btn" href="{{ e.booking_url }}" target="_blank" rel="noopener">Book →</a></td>
       </tr>
     {% endfor %}
     </tbody>
