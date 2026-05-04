@@ -117,7 +117,24 @@ async def index(request: Request,
         events = s.exec(q).all()
 
         all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
-        circuits = sorted({e.circuit for e in all_events})
+
+        # Build the Circuit dropdown so it ONLY shows circuits that have at
+        # least one event matching the *currently active* Source/Vehicle/Session
+        # filters (excluding the Circuit filter itself, so the user can change it).
+        def _matches_other_filters(e: Event) -> bool:
+            if vehicle and e.vehicle_type != vehicle:
+                return False
+            if session and e.session != session:
+                return False
+            if source == "region-uk" and e.region != "UK":
+                return False
+            if source == "region-eu" and e.region != "EU":
+                return False
+            if source and source not in ("region-uk", "region-eu") and e.source != source:
+                return False
+            return True
+        circuits = sorted({e.circuit for e in all_events if _matches_other_filters(e)})
+
         # Source dropdown grouped by region: UK organisers, then EU.
         from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
         source_slugs = sorted({e.source for e in all_events})
