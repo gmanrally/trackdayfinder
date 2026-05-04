@@ -44,12 +44,19 @@ TF_TIMES = {
 
 
 # Map keywords found in event titles to canonical circuits.
+# Order matters — most specific tokens first so e.g. "Nordschleife" doesn't
+# get caught by the generic "nürburgring" alias below.
 TITLE_CIRCUITS = [
-    ("nordschleife", "Nürburgring (Nordschleife)"),
-    ("nürburgring", "Nürburgring"),
-    ("nurburgring", "Nürburgring"),
-    ("gp-strecke", "Nürburgring"),
-    ("gp strecke", "Nürburgring"),
+    ("nordschleife",       "Nürburgring (Nordschleife)"),
+    ("nls combined",       "Nürburgring (Nordschleife)"),  # VLN/NLS layout = Nordschleife + GP infield
+    ("combined circuit",   "Nürburgring (Nordschleife)"),
+    ("gp track",           "Nürburgring (Grand Prix)"),    # RSR-organised GP-Strecke trackdays
+    ("gp-strecke",         "Nürburgring (Grand Prix)"),
+    ("gp strecke",         "Nürburgring (Grand Prix)"),
+    ("grand prix-strecke", "Nürburgring (Grand Prix)"),
+    ("after work classics","Nürburgring (Grand Prix)"),    # GP evening sessions
+    ("nürburgring",        "Nürburgring (Grand Prix)"),    # plain Ring without qualifier = GP track
+    ("nurburgring",        "Nürburgring (Grand Prix)"),
     ("monza", "Monza"),
     ("portimao", "Portimão"),
     ("portimão", "Portimão"),

@@ -41,6 +41,7 @@ CIRCUIT_COORDS: dict[str, tuple[float, float]] = {
     # ===== Europe =====
     "Spa-Francorchamps":              (50.4372,  5.9714),
     "Nürburgring":                     (50.3356,  6.9475),
+    "Nürburgring (Grand Prix)":        (50.3356,  6.9475),
     "Nürburgring (Nordschleife)":      (50.3356,  6.9475),
     "Zandvoort":                       (52.3886,  4.5408),
     "Hockenheim":                      (49.3289,  8.5658),
@@ -182,6 +183,7 @@ CIRCUIT_WEBSITES: dict[str, str] = {
     # ===== Europe =====
     "Spa-Francorchamps":            "https://www.spa-francorchamps.be/",
     "Nürburgring":                  "https://www.nuerburgring.de/",
+    "Nürburgring (Grand Prix)":     "https://www.nuerburgring.de/driving/touristdrives",
     "Nürburgring (Nordschleife)":   "https://www.nuerburgring.de/driving/touristdrives",
     "Zandvoort":                    "https://www.circuitzandvoort.nl/",
     "Hockenheim":                   "https://www.hockenheimring.de/",

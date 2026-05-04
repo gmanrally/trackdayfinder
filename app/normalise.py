@@ -30,14 +30,16 @@ CIRCUIT_ALIASES = {
     # ---- Europe ----
     "spa": "Spa-Francorchamps",
     "francorchamps": "Spa-Francorchamps",
-    # Nordschleife checks must precede the generic "nurburgring" alias so the
-    # 21km loop isn't collapsed into the GP circuit.
+    # Specific circuit-layout aliases must come before the generic "nurburgring"
+    # alias so we don't lose the layout (Nordschleife / GP) distinction.
     "nordschleife": "Nürburgring (Nordschleife)",
     "nordschl": "Nürburgring (Nordschleife)",
     "nürburgring (nordschleife)": "Nürburgring (Nordschleife)",
     "nurburgring (nordschleife)": "Nürburgring (Nordschleife)",
-    "nurburgring": "Nürburgring",
-    "nürburgring": "Nürburgring",
+    "nürburgring (grand prix)": "Nürburgring (Grand Prix)",
+    "nurburgring (grand prix)": "Nürburgring (Grand Prix)",
+    "nurburgring": "Nürburgring (Grand Prix)",
+    "nürburgring": "Nürburgring (Grand Prix)",
     "zandvoort": "Zandvoort",
     "hockenheim": "Hockenheim",
     "magny-cours": "Magny-Cours",
