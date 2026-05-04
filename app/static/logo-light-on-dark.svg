@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 140" role="img" aria-label="TrackdayFinder">
-  <title>TrackdayFinder (light on dark)</title>
-  <rect width="880" height="140" fill="#0b1220"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 140" role="img" aria-label="TrackdayFinder.co.uk">
+  <title>TrackdayFinder.co.uk (light on dark)</title>
+  <rect width="1100" height="140" fill="#0b1220"/>
 
-  <!-- Flag pole -->
   <rect x="14" y="10" width="6" height="120" rx="2" fill="#ffffff"/>
   <g transform="translate(24,14)">
     <g transform="skewY(-3)">
@@ -26,5 +25,5 @@
         font-weight="800"
         font-size="78"
         letter-spacing="-2"
-        fill="#ffffff">Trackday<tspan fill="#dc2626">Finder</tspan></text>
+        fill="#ffffff">Trackday<tspan fill="#dc2626">Finder</tspan><tspan font-size="48" dx="2" fill="#ffffff">.co.uk</tspan></text>
 </svg>
