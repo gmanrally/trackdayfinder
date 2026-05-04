@@ -42,6 +42,31 @@
   .fc-list-event-time, .fc-list-day-cushion { color: var(--fg) !important; }
   .fc-list-day-cushion { background: #f1f5f9 !important; font-weight: 700; }
   .fc-list-event.soldout .fc-list-event-title a { opacity: 0.5; text-decoration: line-through; }
+
+  /* === Mobile: undo the base table->card CSS so FullCalendar's own tables
+     can render normally, and tighten chrome. === */
+  @media (max-width: 720px) {
+    #cal-wrap { padding: 8px; }
+    #trackday-cal { padding: 4px; }
+    .fc, .fc table, .fc thead, .fc tbody, .fc tr, .fc th, .fc td {
+      display: revert !important;
+      border: revert; padding: revert; background: revert;
+      box-shadow: none; margin: 0;
+    }
+    .fc tr { display: table-row !important; }
+    .fc thead, .fc tbody { display: table-row-group !important; }
+    .fc table { display: table !important; width: 100% !important; }
+    .fc th, .fc td { display: table-cell !important; }
+    .fc td::before { content: none !important; }    /* drop our data-label pseudo */
+    .fc .fc-toolbar { flex-wrap: wrap; gap: 6px; }
+    .fc .fc-toolbar-title { font-size: 15px; }
+    .fc .fc-button { padding: 4px 8px; font-size: 12px; }
+    .fc .fc-daygrid-day-number { font-size: 11px; padding: 2px; }
+    .fc-daygrid-event { font-size: 9px; padding: 1px 3px; }
+    .fc .fc-col-header-cell-cushion { font-size: 10px; padding: 4px 2px; }
+    .legend { font-size: 11px; gap: 8px; }
+    .legend > span:last-child { display: none; }    /* hide help text on narrow */
+  }
   .fc-day-today { background: #fef2f2 !important; }
   .legend { padding: 8px 0 12px; font-size: 12px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
   .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
@@ -65,14 +90,17 @@
 <script>
   const events = {{ events_json | tojson }};
   document.addEventListener('DOMContentLoaded', () => {
+    const isMobile = window.matchMedia('(max-width: 720px)').matches;
     const cal = new FullCalendar.Calendar(document.getElementById('trackday-cal'), {
-      initialView: 'dayGridMonth',
+      initialView: isMobile ? 'listMonth' : 'dayGridMonth',
       initialDate: '{{ today_iso }}',
       firstDay: 1,                 // Monday-start week
-      headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
-      buttonText: { listMonth: 'List', today: 'Today', month: 'Month' },
+      headerToolbar: isMobile
+        ? { left: 'prev,next', center: 'title', right: 'today,listMonth,dayGridMonth' }
+        : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
+      buttonText: { listMonth: 'List', today: 'Today', month: 'Month', dayGridMonth: 'Grid' },
       height: 'auto',
-      dayMaxEvents: 4,
+      dayMaxEvents: isMobile ? 2 : 4,
       events,
       eventClick: function (info) {
         info.jsEvent.preventDefault();

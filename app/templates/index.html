@@ -8,10 +8,6 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
 {% endblock %}
 
-{% block header_meta %}
-<span class="meta">{{ count }} events · last refresh {{ last_run or "never" }}</span>
-{% endblock %}
-
 {% block content %}
 {% include "_filters.html" %}
 

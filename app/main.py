@@ -29,6 +29,21 @@ def slugify(s: str) -> str:
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 templates.env.filters["slugify"] = slugify
 
+
+def _global_meta() -> dict:
+    """Total upcoming events + last refresh time — exposed to every template."""
+    from sqlmodel import func
+    today = date.today()
+    with db_session() as s:
+        n = s.exec(select(func.count(Event.id)).where(Event.event_date >= today)).one()
+        last = s.exec(select(ScrapeRun).order_by(ScrapeRun.finished_at.desc())).first()
+    return {
+        "count": n if isinstance(n, int) else (n[0] if n else 0),
+        "last_run": last.finished_at.strftime("%Y-%m-%d %H:%M") if last and last.finished_at else None,
+    }
+
+templates.env.globals["global_meta"] = _global_meta
+
 app = FastAPI(title="TrackdayFinder")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 scheduler = AsyncIOScheduler()

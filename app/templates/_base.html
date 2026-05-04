@@ -310,7 +310,8 @@
     <a href="/map">Map</a>
     <a href="/calendar">Calendar</a>
   </nav>
-  {% block header_meta %}{% endblock %}
+  {% set _gm = global_meta() %}
+  <span class="meta">{{ _gm.count }} events · last refresh {{ _gm.last_run or "never" }}</span>
 </header>
 
 {% block crumbs %}{% endblock %}
