@@ -25,6 +25,23 @@ FEED_URL = "https://rsrbooking.com/events/populate"
 BOOKING_URL = "https://rsrbooking.com/bookings/select-event?date={date}"
 DEBUG_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "debug"
 
+# Tourist Drives (Touristenfahrten) are NOT bookable through RSR — you turn up
+# at the Ring and pay per lap. We re-tag those entries to a separate source so
+# they're attributed to the Nürburgring directly and link to the official page.
+TF_SOURCE = "nurburgring_tf"
+TF_ORGANISER = "Nürburgring (Touristenfahrten)"
+TF_BOOKING_URL = "https://www.nuerburgring.de/driving/touristdrives"
+
+# Approximate published TF session windows. Real times shift through the season
+# (mainly daylight) — this is a useful indicator, not gospel. Source: official
+# Nürburgring opening-hours pages (April–September main season).
+TF_TIMES = {
+    "evening":  "Mon–Fri evenings · ~17:15–19:30",
+    "full day": "All-day session · ~08:00–dusk",
+    "half day": "Half-day session · morning OR afternoon",
+    "1 hour":   "1-hour slot",
+}
+
 
 # Map keywords found in event titles to canonical circuits.
 TITLE_CIRCUITS = [
@@ -88,8 +105,30 @@ async def fetch() -> list[RawEvent]:
 
         circuit = _circuit_from_title(title)
         is_package = bool(re.search(r"\(\s*\d+\s*days?\s*\)|premium|package|trip", title, re.I))
-        booking_url = BOOKING_URL.format(date=event_date.strftime("%d-%m-%Y"))
 
+        # Touristenfahrten — re-tag to Nürburgring direct, link to official page
+        # and add typical session-time hint based on the title's session marker.
+        low_title = title.lower()
+        if "tourist drives" in low_title or "touristenfahrten" in low_title:
+            time_hint = None
+            for marker, hint in TF_TIMES.items():
+                if marker in low_title:
+                    time_hint = hint
+                    break
+            display_title = f"{title} — {time_hint}" if time_hint else title
+            out.append(RawEvent(
+                source=TF_SOURCE, organiser=TF_ORGANISER,
+                circuit_raw="Nürburgring (Nordschleife)",
+                event_date=event_date,
+                booking_url=TF_BOOKING_URL,
+                title=display_title,
+                notes=time_hint,
+                currency="EUR", region="EU",
+                session="day", external_id=eid,
+            ))
+            continue
+
+        booking_url = BOOKING_URL.format(date=event_date.strftime("%d-%m-%Y"))
         out.append(RawEvent(
             source=SOURCE_SLUG, organiser=ORGANISER,
             circuit_raw=circuit, event_date=event_date, booking_url=booking_url,

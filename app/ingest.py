@@ -19,12 +19,16 @@ async def run_one(slug: str) -> tuple[int, str | None]:
         with session() as s:
             for raw in raws:
                 circuit = canonical_circuit(raw.circuit_raw)
-                key = make_dedup_key(slug, circuit, raw.event_date, raw.organiser,
+                # Honour raw.source if a scraper splits its output into multiple
+                # logical sources (e.g. RSR pulls out Touristenfahrten as "nurburgring_tf").
+                event_source = raw.source or slug
+                key = make_dedup_key(event_source, circuit, raw.event_date, raw.organiser,
                                      external_id=raw.external_id, session=raw.session)
                 existing = s.exec(select(Event).where(Event.dedup_key == key)).first()
-                ev = existing or Event(dedup_key=key, source=slug, organiser=raw.organiser,
+                ev = existing or Event(dedup_key=key, source=event_source, organiser=raw.organiser,
                                        circuit=circuit, circuit_raw=raw.circuit_raw,
                                        event_date=raw.event_date, booking_url=raw.booking_url)
+                ev.source = event_source
                 ev.circuit = circuit
                 ev.circuit_raw = raw.circuit_raw
                 ev.event_date = raw.event_date

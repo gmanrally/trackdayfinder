@@ -42,6 +42,7 @@ ORGANISER_DISPLAY = {
     "rsr_nurburg": "RSRNurburg (Europe)",
     "gedlich": "GEDLICH Racing",
     "trackdays_events": "Trackdays.events (aggregator)",
+    "nurburgring_tf": "Nürburgring (Touristenfahrten)",
 }
 
 # Region grouping for the dropdown (UK first, EU after).
@@ -53,4 +54,5 @@ SOURCE_REGION = {
     "rsr_nurburg": "EU",
     "gedlich": "EU",
     "trackdays_events": "EU",
+    "nurburgring_tf": "EU",
 }
