@@ -19,7 +19,10 @@ from ._base import RawEvent, UA
 SOURCE_SLUG = "rsr_nurburg"
 ORGANISER = "RSRNurburg"
 FEED_URL = "https://rsrbooking.com/events/populate"
-EVENT_DETAIL = "https://rsrbooking.com/bookings/select-car/{id}"
+# RSR has no public per-event URL — clicks on the calendar are inert. The actual
+# booking flow is renting a car at /cars?date=DD-MM-YYYY (Ring laps) or
+# contacting them. We deep-link to the rental page filtered to the event date.
+BOOKING_URL = "https://rsrbooking.com/cars?date={date}"
 DEBUG_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "debug"
 
 
@@ -85,7 +88,7 @@ async def fetch() -> list[RawEvent]:
 
         circuit = _circuit_from_title(title)
         is_package = bool(re.search(r"\(\s*\d+\s*days?\s*\)|premium|package|trip", title, re.I))
-        booking_url = EVENT_DETAIL.format(id=eid) if eid else "https://rsrbooking.com/calendar"
+        booking_url = BOOKING_URL.format(date=event_date.strftime("%d-%m-%Y"))
 
         out.append(RawEvent(
             source=SOURCE_SLUG, organiser=ORGANISER,
