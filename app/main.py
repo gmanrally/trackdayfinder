@@ -112,7 +112,15 @@ async def slim_for_link_bots(request: Request, call_next):
 <p>Europe's largest trackday database. <a href="{canonical}">Visit the site</a>.</p>
 </body></html>"""
     from starlette.responses import HTMLResponse as _H
-    return _H(html, headers={"Cache-Control": "public, max-age=300"})
+    body_bytes = html.encode("utf-8")
+    return _H(body_bytes, headers={
+        # `no-transform` tells nginx + any intermediary to deliver the body
+        # byte-for-byte, no gzip and no chunking. Some link-preview bots
+        # (notably Facebook on small responses) misparse gzipped+chunked HTML.
+        "Cache-Control": "public, max-age=300, no-transform",
+        "Content-Length": str(len(body_bytes)),
+        "X-Accel-Buffering": "no",
+    })
 
 
 def _qs_no_sort(request: Request) -> str:
