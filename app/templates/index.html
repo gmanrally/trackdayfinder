@@ -58,12 +58,15 @@
   header .tagline a { color: #f8fafc; text-decoration: none; border-bottom: 1px dashed #475569; }
   header .tagline a:hover { color: #fff; border-color: #fff; }
 
-  /* GMRacing brand mark — all white, R in red. Used in header (dark bg) and
-     footer (light bg, dark variant overrides white -> dark text). */
-  .brand-gmracing { font-weight: 600; color: #ffffff; }
-  .brand-gmracing .brand-r { color: var(--accent); }
-  .brand-gmracing-dark { color: #1f2937; }
-  footer .brand-gmracing { text-decoration: none; }
+  /* GMRacing brand mark — header on dark bg uses white; footer on light bg
+     uses dark; the R is always red. Inner span explicitly inherits font so
+     letterform stays identical to the surrounding text. */
+  .brand-gmracing { font-weight: 600; color: #ffffff; text-decoration: none; }
+  .brand-gmracing .brand-r {
+    color: var(--accent) !important;
+    font: inherit; font-weight: inherit; letter-spacing: inherit;
+  }
+  footer .brand-gmracing { color: #1f2937 !important; }
   footer .brand-gmracing:hover { text-decoration: underline; }
   header .meta {
     color: #94a3b8; font-size: 12px; margin-left: auto;
