@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -16,6 +17,7 @@ BASE = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE / "templates"))
 
 app = FastAPI(title="TrackdayFinder")
+app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 scheduler = AsyncIOScheduler()
 
 
