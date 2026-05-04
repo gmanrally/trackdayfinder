@@ -65,6 +65,56 @@ async def head_as_get(request: Request, call_next):
     return _R(status_code=response.status_code, headers=dict(response.headers))
 
 
+# Link-preview bots (Facebook, Twitter, LinkedIn, Slack, Discord etc.) only
+# care about the <meta og:*> tags. Our index can be 1.5 MB which is over
+# Facebook's OG-parse limit, so they fail to extract tags despite them
+# being at the top of <head>. Serve a tiny standalone page when the UA matches.
+_LINK_BOT_UA = re.compile(
+    r"(facebookexternalhit|facebookcatalog|Twitterbot|LinkedInBot|Slackbot|"
+    r"discordbot|WhatsApp|TelegramBot|Pinterestbot|SkypeUriPreview|"
+    r"Embedly|Iframely|redditbot|vkShare|W3C_Validator|XING-contenttabreceiver|"
+    r"Applebot|bingbot|Googlebot.*Snippet|Mastodon|Bluesky|google-imageproxy)",
+    re.I,
+)
+
+@app.middleware("http")
+async def slim_for_link_bots(request: Request, call_next):
+    ua = request.headers.get("user-agent", "")
+    if not _LINK_BOT_UA.search(ua):
+        return await call_next(request)
+    # Serve only the home/canonical page slim version. Other paths still
+    # get the normal response (those have small templates anyway).
+    if request.url.path not in ("/", ""):
+        return await call_next(request)
+    today_year = date.today().year
+    canonical = f"{CANONICAL_HOST}/"
+    html = f"""<!doctype html><html lang="en-GB"><head>
+<meta charset="utf-8">
+<title>TrackdayFinder.co.uk — Europe's largest trackday database</title>
+<meta name="description" content="Europe's largest trackday database. Find car and bike trackdays across the UK and Europe — free, no sign-up.">
+<link rel="canonical" href="{canonical}">
+
+<meta property="og:site_name" content="TrackdayFinder.co.uk">
+<meta property="og:type" content="website">
+<meta property="og:title" content="TrackdayFinder — Europe's largest trackday database">
+<meta property="og:description" content="Find car and bike trackdays across Europe. 1,600+ events, free to use, no sign-up.">
+<meta property="og:url" content="{canonical}">
+<meta property="og:image" content="{CANONICAL_HOST}/static/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="TrackdayFinder — Europe's largest trackday database">
+<meta name="twitter:description" content="Find car and bike trackdays across Europe. 1,600+ events, free to use, no sign-up.">
+<meta name="twitter:image" content="{CANONICAL_HOST}/static/og-image.jpg">
+</head><body>
+<h1>TrackdayFinder.co.uk</h1>
+<p>Europe's largest trackday database. <a href="{canonical}">Visit the site</a>.</p>
+</body></html>"""
+    from starlette.responses import HTMLResponse as _H
+    return _H(html, headers={"Cache-Control": "public, max-age=300"})
+
+
 def _qs_no_sort(request: Request) -> str:
     """Current query string with the `sort` param stripped, urlencoded.
     Used by sort-link template macro so clicking a column preserves filters."""
