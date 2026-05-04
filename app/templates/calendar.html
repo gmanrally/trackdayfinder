@@ -19,11 +19,29 @@
   .fc .fc-button-primary:hover, .fc .fc-button-primary:not(:disabled).fc-button-active {
     background: var(--accent-2); border-color: var(--accent-2);
   }
-  .fc-event { cursor: pointer; border: 0 !important; padding: 1px 4px; font-size: 11px; }
-  .fc-event.uk  { background: #dc2626; color: #fff; }
-  .fc-event.eu  { background: #1e40af; color: #fff; }
-  .fc-event.tf  { background: #475569; color: #fff; }
-  .fc-event.soldout { opacity: 0.45; text-decoration: line-through; }
+  /* Month-grid event pills */
+  .fc-daygrid-event { cursor: pointer; border: 0 !important; padding: 1px 4px; font-size: 11px; }
+  .fc-daygrid-event.uk  { background: #dc2626; color: #fff; }
+  .fc-daygrid-event.eu  { background: #1e40af; color: #fff; }
+  .fc-daygrid-event.tf  { background: #475569; color: #fff; }
+  .fc-daygrid-event.soldout { opacity: 0.45; text-decoration: line-through; }
+  .fc-daygrid-event .fc-event-title { color: #fff !important; font-weight: 500; }
+
+  /* List view: keep rows on a clean white background; show region/category as
+     a small left-edge stripe instead of a full coloured row. */
+  .fc-list-event { background: #fff !important; cursor: pointer; }
+  .fc-list-event:hover td { background: var(--hi-bg) !important; }
+  .fc-list-event-graphic .fc-list-event-dot {
+    border-width: 6px !important;
+  }
+  .fc-list-event.uk .fc-list-event-dot { border-color: #dc2626 !important; }
+  .fc-list-event.eu .fc-list-event-dot { border-color: #1e40af !important; }
+  .fc-list-event.tf .fc-list-event-dot { border-color: #475569 !important; }
+  .fc-list-event-title a { color: var(--fg) !important; font-weight: 500; }
+  .fc-list-event-title a:hover { color: var(--accent) !important; }
+  .fc-list-event-time, .fc-list-day-cushion { color: var(--fg) !important; }
+  .fc-list-day-cushion { background: #f1f5f9 !important; font-weight: 700; }
+  .fc-list-event.soldout .fc-list-event-title a { opacity: 0.5; text-decoration: line-through; }
   .fc-day-today { background: #fef2f2 !important; }
   .legend { padding: 8px 0 12px; font-size: 12px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
   .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
