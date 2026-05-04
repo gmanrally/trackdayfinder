@@ -3,6 +3,7 @@ from . import (
     mot, nolimits, goldtrack, msevents, goodwood,
     slipandgrip, trackobsession,
     rsr_nurburg, gedlich, trackdays_events,
+    pembrey, llandow, kirkistown,
 )
 
 SCRAPERS = {
@@ -22,6 +23,9 @@ SCRAPERS = {
     "rsr_nurburg": rsr_nurburg,
     "gedlich": gedlich,
     "trackdays_events": trackdays_events,
+    "pembrey": pembrey,
+    "llandow": llandow,
+    "kirkistown": kirkistown,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -43,6 +47,9 @@ ORGANISER_DISPLAY = {
     "gedlich": "GEDLICH Racing",
     "trackdays_events": "Trackdays.events (aggregator)",
     "nurburgring_tf": "Nürburgring (Touristenfahrten)",
+    "pembrey": "Pembrey Circuit",
+    "llandow": "Llandow Circuit",
+    "kirkistown": "Kirkistown Racing Circuit",
 }
 
 # Region grouping for the dropdown (UK first, EU after).
@@ -55,4 +62,7 @@ SOURCE_REGION = {
     "gedlich": "EU",
     "trackdays_events": "EU",
     "nurburgring_tf": "EU",
+    "pembrey": "UK",
+    "llandow": "UK",
+    "kirkistown": "UK",
 }

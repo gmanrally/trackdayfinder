@@ -189,16 +189,25 @@ async def event_detail(request: Request, source: str, key: str):
 @app.get("/circuit/{slug}", response_class=HTMLResponse)
 async def circuit_page(request: Request, slug: str):
     """SEO landing page for one circuit — all upcoming dates there."""
+    from .circuit_coords import CIRCUIT_COORDS
     today = date.today()
     with db_session() as s:
         all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
     matching = [e for e in all_events if slugify(e.circuit) == slug]
-    if not matching:
-        raise HTTPException(status_code=404, detail="Circuit not found")
     matching.sort(key=lambda e: e.event_date)
     organisers = sorted({e.organiser for e in matching})
+
+    # Use the canonical name from a matching event if we have one; otherwise
+    # try the coords table (so map's grey markers still resolve to a page).
+    if matching:
+        circuit_name = matching[0].circuit
+    else:
+        circuit_name = next((c for c in CIRCUIT_COORDS if slugify(c) == slug), None)
+    if not circuit_name:
+        raise HTTPException(status_code=404, detail="Circuit not found")
+
     return templates.TemplateResponse(request, "circuit.html", {
-        "circuit": matching[0].circuit,
+        "circuit": circuit_name,
         "events": matching,
         "organisers": organisers,
         "now_year": today.year,
@@ -224,6 +233,210 @@ async def organiser_page(request: Request, source: str):
         "events": events,
         "circuits": circuits,
         "now_year": today.year,
+    })
+
+
+@app.get("/calendar", response_class=HTMLResponse)
+async def calendar_page(request: Request,
+                        circuit: Optional[str] = None,
+                        vehicle: Optional[str] = None,
+                        source: Optional[str] = None,
+                        session: Optional[str] = None,
+                        from_: Optional[str] = None,
+                        to: Optional[str] = None,
+                        max_price: Optional[str] = None,
+                        hide_sold_out: Optional[str] = None):
+    """Month-grid calendar view of all upcoming events. Same filters as index."""
+    from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
+    today = date.today()
+    with db_session() as s:
+        q = select(Event).where(Event.event_date >= today)
+        if circuit:                     q = q.where(Event.circuit == circuit)
+        if vehicle:                     q = q.where(Event.vehicle_type == vehicle)
+        if source == "region-uk":       q = q.where(Event.region == "UK")
+        elif source == "region-eu":     q = q.where(Event.region == "EU")
+        elif source:                    q = q.where(Event.source == source)
+        if session:                     q = q.where(Event.session == session)
+        if from_:
+            try: q = q.where(Event.event_date >= date.fromisoformat(from_))
+            except ValueError: pass
+        if to:
+            try: q = q.where(Event.event_date <= date.fromisoformat(to))
+            except ValueError: pass
+        if max_price:
+            try: q = q.where(Event.price_gbp <= float(max_price))
+            except ValueError: pass
+        if hide_sold_out:
+            q = q.where(Event.sold_out == False)  # noqa: E712
+        events = s.exec(q.order_by(Event.event_date)).all()
+        all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
+
+    # Build events array for FullCalendar
+    events_json = []
+    for e in events:
+        klass = "uk" if e.region == "UK" else "eu"
+        if e.source == "nurburgring_tf":
+            klass = "tf"
+        if e.sold_out:
+            klass += " soldout"
+        title = f"{e.circuit} · {e.organiser}"
+        events_json.append({
+            "title": title,
+            "start": e.event_date.isoformat(),
+            "url":   e.booking_url,
+            "classNames": [c for c in klass.split() if c],
+        })
+
+    # Filter dropdown context (mirror of index)
+    def _matches_other_filters(e: Event) -> bool:
+        if vehicle and e.vehicle_type != vehicle: return False
+        if session and e.session != session: return False
+        if source == "region-uk" and e.region != "UK": return False
+        if source == "region-eu" and e.region != "EU": return False
+        if source and source not in ("region-uk", "region-eu") and e.source != source: return False
+        return True
+    circuits = sorted({e.circuit for e in all_events_today if _matches_other_filters(e)})
+    source_slugs = sorted({e.source for e in all_events_today})
+    def _row(slug):
+        return (slug, ORGANISER_DISPLAY.get(slug, slug.replace("_", " ").title()))
+    sources_grouped = [
+        ("UK organisers", [_row(s) for s in source_slugs if SOURCE_REGION.get(s, "UK") == "UK"]),
+        ("European",      [_row(s) for s in source_slugs if SOURCE_REGION.get(s, "UK") == "EU"]),
+    ]
+    sources_grouped = [g for g in sources_grouped if g[1]]
+    sessions = sorted({e.session for e in all_events_today if e.session})
+
+    return templates.TemplateResponse(request, "calendar.html", {
+        "events_json": events_json,
+        "now_year": today.year,
+        "today_iso": today.isoformat(),
+        "circuits": circuits,
+        "sources_grouped": sources_grouped,
+        "sessions": sessions,
+        "filters": {
+            "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
+            "from_": from_, "to": to, "max_price": max_price,
+            "hide_sold_out": bool(hide_sold_out),
+        },
+    })
+
+
+@app.get("/map", response_class=HTMLResponse)
+async def map_page(request: Request,
+                   circuit: Optional[str] = None,
+                   vehicle: Optional[str] = None,
+                   source: Optional[str] = None,
+                   session: Optional[str] = None,
+                   from_: Optional[str] = None,
+                   to: Optional[str] = None,
+                   max_price: Optional[str] = None,
+                   hide_sold_out: Optional[str] = None):
+    """Interactive map of UK + EU circuits with upcoming events.
+    Honours the same filter set as the index calendar."""
+    from collections import Counter
+    from .circuit_coords import CIRCUIT_COORDS
+    from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
+    today = date.today()
+    with db_session() as s:
+        q = select(Event).where(Event.event_date >= today)
+        if circuit:
+            q = q.where(Event.circuit == circuit)
+        if vehicle:
+            q = q.where(Event.vehicle_type == vehicle)
+        if source == "region-uk":
+            q = q.where(Event.region == "UK")
+        elif source == "region-eu":
+            q = q.where(Event.region == "EU")
+        elif source:
+            q = q.where(Event.source == source)
+        if session:
+            q = q.where(Event.session == session)
+        if from_:
+            try: q = q.where(Event.event_date >= date.fromisoformat(from_))
+            except ValueError: pass
+        if to:
+            try: q = q.where(Event.event_date <= date.fromisoformat(to))
+            except ValueError: pass
+        if max_price:
+            try: q = q.where(Event.price_gbp <= float(max_price))
+            except ValueError: pass
+        if hide_sold_out:
+            q = q.where(Event.sold_out == False)  # noqa: E712
+        events = s.exec(q).all()
+
+        all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
+
+    # Build dropdown context (same shape as index)
+    def _matches_other_filters(e: Event) -> bool:
+        if vehicle and e.vehicle_type != vehicle: return False
+        if session and e.session != session: return False
+        if source == "region-uk" and e.region != "UK": return False
+        if source == "region-eu" and e.region != "EU": return False
+        if source and source not in ("region-uk", "region-eu") and e.source != source: return False
+        return True
+    circuits = sorted({e.circuit for e in all_events_today if _matches_other_filters(e)})
+    source_slugs = sorted({e.source for e in all_events_today})
+    def _row(slug):
+        return (slug, ORGANISER_DISPLAY.get(slug, slug.replace("_", " ").title()))
+    sources_grouped = [
+        ("UK organisers", [_row(s) for s in source_slugs if SOURCE_REGION.get(s, "UK") == "UK"]),
+        ("European",      [_row(s) for s in source_slugs if SOURCE_REGION.get(s, "UK") == "EU"]),
+    ]
+    sources_grouped = [g for g in sources_grouped if g[1]]
+    sessions = sorted({e.session for e in all_events_today if e.session})
+
+    from .circuit_coords import CIRCUIT_WEBSITES, EXTERNAL_CIRCUITS
+    counts = Counter(e.circuit for e in events)
+    next_dates: dict[str, str] = {}
+    next_events: dict[str, list[dict]] = {}   # circuit -> up to 5 next events
+    for e in sorted(events, key=lambda x: x.event_date):
+        next_dates.setdefault(e.circuit, e.event_date.isoformat())
+        bucket = next_events.setdefault(e.circuit, [])
+        if len(bucket) < 5:
+            bucket.append({
+                "date": e.event_date.strftime("%a %d %b %Y"),
+                "iso":  e.event_date.isoformat(),
+                "title": (e.title or "Trackday")[:60],
+                "organiser": e.organiser,
+                "url": e.booking_url,
+                "sold_out": e.sold_out,
+            })
+    points = []                # circuits with upcoming matches — red numbered
+    external_points = []       # active venues we don't scrape — red "?" marker
+    inactive_points = []       # circuits we know but have no current events — grey
+    for circuit_name, (lat, lng) in CIRCUIT_COORDS.items():
+        n = counts.get(circuit_name, 0)
+        marker = {
+            "name": circuit_name,
+            "slug": slugify(circuit_name),
+            "lat": lat,
+            "lng": lng,
+            "count": n,
+            "next": next_dates.get(circuit_name, ""),
+            "events": next_events.get(circuit_name, []),
+            "website": CIRCUIT_WEBSITES.get(circuit_name),
+        }
+        if circuit_name in EXTERNAL_CIRCUITS:
+            external_points.append(marker)
+        elif n > 0:
+            points.append(marker)
+        else:
+            inactive_points.append(marker)
+
+    return templates.TemplateResponse(request, "map.html", {
+        "points": points,
+        "external_points": external_points,
+        "inactive_points": inactive_points,
+        "now_year": today.year,
+        "today_iso": today.isoformat(),
+        "circuits": circuits,
+        "sources_grouped": sources_grouped,
+        "sessions": sessions,
+        "filters": {
+            "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
+            "from_": from_, "to": to, "max_price": max_price,
+            "hide_sold_out": bool(hide_sold_out),
+        },
     })
 
 

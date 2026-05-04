@@ -1,7 +1,7 @@
 {% extends "_base.html" %}
 
-{% block title %}UK Trackday Calendar — search 13 organisers in one place | TrackdayFinder.co.uk{% endblock %}
-{% block meta_description %}{{ count }} upcoming UK trackdays from MSV, Javelin, OpenTrack, Silverstone, Goodwood, RMA and more. Filter by circuit, date, price and availability.{% endblock %}
+{% block title %}TrackdayFinder.co.uk — Europe's largest trackday database{% endblock %}
+{% block meta_description %}Europe's largest trackday database — {{ count }} upcoming UK and European trackdays. Search by circuit, date, price and availability across 16 organisers including MSV, Javelin, OpenTrack, Silverstone, Goodwood, RSR Nürburgring and more.{% endblock %}
 
 {% block head_extra %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
@@ -13,84 +13,7 @@
 {% endblock %}
 
 {% block content %}
-<form class="filters" method="get" action="/">
-  <label>Circuit
-    <select name="circuit">
-      <option value="">Any</option>
-      {% for c in circuits %}<option value="{{ c }}" {% if c == filters.circuit %}selected{% endif %}>{{ c }}</option>{% endfor %}
-    </select>
-  </label>
-  <label>Vehicle
-    <select name="vehicle">
-      <option value="">Any</option>
-      <option value="car" {% if filters.vehicle == 'car' %}selected{% endif %}>Car</option>
-      <option value="bike" {% if filters.vehicle == 'bike' %}selected{% endif %}>Bike</option>
-    </select>
-  </label>
-  <label>Session
-    <select name="session">
-      <option value="">Any</option>
-      {% for s in sessions %}<option value="{{ s }}" {% if s == filters.session %}selected{% endif %}>{{ s }}</option>{% endfor %}
-    </select>
-  </label>
-  <label>Source
-    <select name="source">
-      <option value="">All sources</option>
-      <option value="region-uk" {% if filters.source == 'region-uk' %}selected{% endif %}>All UK organisers</option>
-      <option value="region-eu" {% if filters.source == 'region-eu' %}selected{% endif %}>All European organisers</option>
-      {% for group_label, items in sources_grouped %}
-      <optgroup label="{{ group_label }}">
-        {% for slug, name in items %}<option value="{{ slug }}" {% if slug == filters.source %}selected{% endif %}>{{ name }}</option>{% endfor %}
-      </optgroup>
-      {% endfor %}
-    </select>
-  </label>
-  <label>Dates
-    <input id="date-range" type="text" placeholder="Any date" autocomplete="off" style="width:200px;cursor:pointer">
-  </label>
-  <input type="hidden" id="from-input" name="from_" value="{{ filters.from_ or '' }}">
-  <input type="hidden" id="to-input" name="to" value="{{ filters.to or '' }}">
-  <script>
-    (function () {
-      var fromI = document.getElementById('from-input');
-      var toI   = document.getElementById('to-input');
-      var rangeI = document.getElementById('date-range');
-      var todayIso = '{{ today_iso }}';
-      var defaults = [];
-      if (fromI.value) defaults.push(fromI.value);
-      if (toI.value)   defaults.push(toI.value);
-      flatpickr(rangeI, {
-        mode: 'range', dateFormat: 'Y-m-d', altInput: true, altFormat: 'd M Y',
-        defaultDate: defaults, minDate: todayIso,
-        onReady: function (_, __, fp) { if (defaults.length === 0) fp.jumpToDate(todayIso); },
-        onChange: function (selectedDates) {
-          fromI.value = selectedDates[0] ? formatISO(selectedDates[0]) : '';
-          toI.value   = selectedDates[1] ? formatISO(selectedDates[1]) : '';
-          if (selectedDates.length === 2) document.querySelector('form.filters').submit();
-        }
-      });
-      function formatISO(d) {
-        return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
-      }
-    })();
-  </script>
-  <label>Max £ <input type="number" name="max_price" value="{{ filters.max_price or '' }}" style="width:80px"></label>
-  <label><input type="checkbox" name="hide_sold_out" {% if filters.hide_sold_out %}checked{% endif %}> Hide sold out</label>
-  <button type="button" id="clear-filters" class="btn-clear">Clear filters</button>
-</form>
-
-<script>
-  (function () {
-    var form = document.querySelector('form.filters');
-    if (!form) return;
-    var debounceTimer;
-    function submitNow() { form.submit(); }
-    function submitDebounced() { clearTimeout(debounceTimer); debounceTimer = setTimeout(submitNow, 350); }
-    form.querySelectorAll('select, input[type=checkbox]').forEach(function (el) { el.addEventListener('change', submitNow); });
-    form.querySelectorAll('input[type=number]').forEach(function (el) { el.addEventListener('input', submitDebounced); });
-    document.getElementById('clear-filters').addEventListener('click', function () { window.location = '/'; });
-  })();
-</script>
+{% include "_filters.html" %}
 
 {% macro sort_link(label, key, current, qs) -%}
   {%- set next_key = key -%}

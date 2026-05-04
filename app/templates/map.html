@@ -1,0 +1,156 @@
+{% extends "_base.html" %}
+
+{% block title %}Trackday Map — UK & European circuits | TrackdayFinder.co.uk{% endblock %}
+{% block meta_description %}Interactive map of every UK and European circuit with upcoming trackdays. Click a marker to see all upcoming dates at that circuit.{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+<style>
+  .map-wrap { flex: 1 1 auto; position: relative; }
+  #trackday-map { position: absolute; inset: 0; }
+  .map-popup-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; color: var(--fg); }
+  .map-popup-meta { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .map-popup-link {
+    display: inline-block; padding: 5px 10px; font-size: 12px; font-weight: 600;
+    background: var(--accent); color: #fff !important; border-radius: 5px; text-decoration: none !important;
+  }
+  .map-popup-events { margin: 6px 0 8px; padding: 0; list-style: none; min-width: 220px; }
+  .map-popup-events li { border-bottom: 1px dashed var(--line); }
+  .map-popup-events li:last-child { border-bottom: 0; }
+  .map-popup-events a {
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 4px 0; color: var(--fg) !important; text-decoration: none !important;
+    font-size: 12px;
+  }
+  .map-popup-events a:hover { color: var(--accent) !important; }
+  .map-popup-events .ev-date { font-weight: 600; flex: 0 0 90px; }
+  .map-popup-events .ev-org  { color: var(--muted); font-size: 11px; }
+  .map-popup-events .soldout { opacity: 0.5; text-decoration: line-through !important; }
+  .leaflet-popup-content { margin: 12px 14px; max-width: 280px; }
+  .marker-count {
+    background: var(--accent); color: #fff;
+    border: 2px solid #fff; border-radius: 50%;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .marker-empty {
+    background: #475569; color: #fff;
+    border: 2.5px solid #fff; border-radius: 50%;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; line-height: 1;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.40);
+  }
+  .marker-empty::before { content: "·"; }
+  .marker-external {
+    background: var(--accent); color: #fff;
+    border: 2px solid #fff; border-radius: 50%;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 14px; line-height: 1;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .map-popup-meta.is-inactive { color: #64748b; font-style: italic; }
+</style>
+{% endblock %}
+
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; Map</nav>{% endblock %}
+
+{% block content %}
+{% include "_filters.html" %}
+<div class="map-wrap">
+  <div id="trackday-map"></div>
+</div>
+
+<script>
+  const points = {{ points | tojson }};
+  const externalPoints = {{ external_points | tojson }};
+  const inactivePoints = {{ inactive_points | tojson }};
+  const map = L.map('trackday-map', { scrollWheelZoom: true }).setView([50.5, 4.5], 5);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  // Hover-with-grace popup helper used by both active + inactive markers.
+  function bindHoverPopup(marker, html) {
+    marker.bindPopup(html, { autoClose: true, closeOnClick: false });
+    let closeTimer;
+    marker.on('mouseover', () => { clearTimeout(closeTimer); marker.openPopup(); });
+    marker.on('mouseout',  () => { closeTimer = setTimeout(() => marker.closePopup(), 220); });
+    marker.on('popupopen', (e) => {
+      e.popup.getElement().addEventListener('mouseenter', () => clearTimeout(closeTimer));
+      e.popup.getElement().addEventListener('mouseleave', () => { closeTimer = setTimeout(() => marker.closePopup(), 220); });
+    });
+  }
+
+  const bounds = [];
+
+  // Active markers — red numbered, on top.
+  points.forEach(p => {
+    const icon = L.divIcon({
+      html: `<div class="marker-count">${p.count}</div>`,
+      iconSize: [30, 30], iconAnchor: [15, 15], className: ''
+    });
+    const m = L.marker([p.lat, p.lng], { icon, riseOnHover: true, title: p.name, zIndexOffset: 1000 }).addTo(map);
+    const evList = (p.events || []).map(e =>
+      `<li><a href="${e.url}" target="_blank" rel="noopener" class="${e.sold_out ? 'soldout' : ''}">
+         <span class="ev-date">${e.date}</span>
+         <span class="ev-org">${e.organiser}</span>
+       </a></li>`
+    ).join('');
+    const html = `
+      <div class="map-popup-name">${p.name}</div>
+      <div class="map-popup-meta">${p.count} upcoming ${p.count === 1 ? 'event' : 'events'}${p.count > 5 ? ' — showing next 5' : ''}</div>
+      <ul class="map-popup-events">${evList}</ul>
+      <a class="map-popup-link" href="/circuit/${p.slug}">All dates at ${p.name} →</a>`;
+    bindHoverPopup(m, html);
+    bounds.push([p.lat, p.lng]);
+  });
+
+  // External markers — venues we know are active but don't currently scrape.
+  // Same red marker so they don't look "lesser" than scraped circuits, but the
+  // count is "?" and the popup links straight to the circuit's own booking site.
+  externalPoints.forEach(p => {
+    const icon = L.divIcon({
+      html: `<div class="marker-external">?</div>`,
+      iconSize: [30, 30], iconAnchor: [15, 15], className: ''
+    });
+    const m = L.marker([p.lat, p.lng], { icon, riseOnHover: true, title: p.name, zIndexOffset: 900 }).addTo(map);
+    const visit = p.website
+      ? `<a class="map-popup-link" target="_blank" rel="noopener" href="${p.website}">Book on circuit site →</a>`
+      : `<a class="map-popup-link" href="/circuit/${p.slug}">Circuit page →</a>`;
+    const html = `
+      <div class="map-popup-name">${p.name}</div>
+      <div class="map-popup-meta">Active trackday venue. We don't yet show their full schedule — bookings are handled directly by the circuit.</div>
+      ${visit}`;
+    bindHoverPopup(m, html);
+    bounds.push([p.lat, p.lng]);
+  });
+
+  // Inactive markers — solid dark-grey, drawn underneath active ones.
+  inactivePoints.forEach(p => {
+    const icon = L.divIcon({
+      html: `<div class="marker-empty"></div>`,
+      iconSize: [22, 22], iconAnchor: [11, 11], className: ''
+    });
+    const m = L.marker([p.lat, p.lng], { icon, riseOnHover: true, title: p.name }).addTo(map);
+    const visit = p.website
+      ? `<a class="map-popup-link" target="_blank" rel="noopener" href="${p.website}">Visit circuit website →</a>`
+      : `<a class="map-popup-link" style="background:#64748b" href="/circuit/${p.slug}">Circuit page →</a>`;
+    const html = `
+      <div class="map-popup-name">${p.name}</div>
+      <div class="map-popup-meta is-inactive">No upcoming events match the current filters.</div>
+      ${visit}`;
+    bindHoverPopup(m, html);
+    bounds.push([p.lat, p.lng]);
+  });
+
+  if (bounds.length) map.fitBounds(bounds, { padding: [40, 40] });
+</script>
+{% endblock %}

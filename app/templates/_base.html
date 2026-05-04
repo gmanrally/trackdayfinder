@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{% block title %}TrackdayFinder.co.uk — UK Trackday Calendar & Booking Search{% endblock %}</title>
-<meta name="description" content="{% block meta_description %}Find every UK trackday in one place. Search 13 organisers (MSV, Javelin, OpenTrack, Silverstone, Goodwood and more) by circuit, date, price and availability.{% endblock %}">
+<title>{% block title %}TrackdayFinder.co.uk — Europe's largest trackday database{% endblock %}</title>
+<meta name="description" content="{% block meta_description %}Europe's largest trackday database. Search every UK and European trackday in one place — by circuit, date, price and availability — across MSV, Javelin, OpenTrack, Silverstone, Goodwood, RSR Nürburgring, and more.{% endblock %}">
 <link rel="canonical" href="{% block canonical %}https://trackdayfinder.co.uk{{ request.url.path }}{% endblock %}">
 
 <!-- OpenGraph / Twitter -->
@@ -64,6 +64,14 @@
   .brand-block .brand-link { align-self: flex-start; }
   .brand-block .tagline { padding-right: 4px; line-height: 1.1; }
   header .meta { margin-left: auto; }
+  header nav.top-nav { display: flex; gap: 14px; }
+  header nav.top-nav a {
+    color: #f8fafc; text-decoration: none; font-weight: 500; font-size: 13px;
+    padding: 6px 12px; border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: background .15s, border-color .15s;
+  }
+  header nav.top-nav a:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
   header h1 { font-size: 26px; font-weight: 700; margin: 0; color: #ffffff; letter-spacing: -0.015em; }
   .brand-link { display: inline-flex; align-items: center; line-height: 0; }
   .brand-logo { height: 44px; width: auto; display: block; }
@@ -297,6 +305,11 @@
       <a class="brand-gmracing" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a>
     </span>
   </div>
+  <nav class="top-nav">
+    <a href="/">Trackday list</a>
+    <a href="/calendar">Calendar</a>
+    <a href="/map">Map</a>
+  </nav>
   {% block header_meta %}{% endblock %}
 </header>
 

@@ -1,0 +1,67 @@
+{% extends "_base.html" %}
+
+{% block title %}Trackday Calendar — month view | TrackdayFinder.co.uk{% endblock %}
+{% block meta_description %}Month-by-month calendar view of every UK and European trackday. Click a day to see what's on; filter by source, circuit and date.{% endblock %}
+
+{% block head_extra %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<style>
+  #cal-wrap { padding: 16px 20px 24px; max-width: 1200px; margin: 0 auto; width: 100%; flex: 1 1 auto; }
+  #trackday-cal { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 8px; box-shadow: var(--shadow-sm); }
+  /* FullCalendar tweaks to match our palette */
+  .fc { font-family: 'Inter', system-ui, sans-serif; }
+  .fc .fc-toolbar-title { font-size: 18px; font-weight: 700; }
+  .fc .fc-button-primary {
+    background: var(--accent); border-color: var(--accent); font-weight: 600;
+  }
+  .fc .fc-button-primary:hover, .fc .fc-button-primary:not(:disabled).fc-button-active {
+    background: var(--accent-2); border-color: var(--accent-2);
+  }
+  .fc-event { cursor: pointer; border: 0 !important; padding: 1px 4px; font-size: 11px; }
+  .fc-event.uk  { background: #dc2626; color: #fff; }
+  .fc-event.eu  { background: #1e40af; color: #fff; }
+  .fc-event.tf  { background: #475569; color: #fff; }
+  .fc-event.soldout { opacity: 0.45; text-decoration: line-through; }
+  .fc-day-today { background: #fef2f2 !important; }
+  .legend { padding: 8px 0 12px; font-size: 12px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+</style>
+{% endblock %}
+
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; Calendar</nav>{% endblock %}
+
+{% block content %}
+{% include "_filters.html" %}
+<div id="cal-wrap">
+  <div class="legend">
+    <span><span class="legend-dot" style="background:#dc2626"></span>UK organiser</span>
+    <span><span class="legend-dot" style="background:#1e40af"></span>European organiser</span>
+    <span><span class="legend-dot" style="background:#475569"></span>Nürburgring tourist drives</span>
+    <span style="margin-left:auto">Click any event to open the booking page in a new tab.</span>
+  </div>
+  <div id="trackday-cal"></div>
+</div>
+
+<script>
+  const events = {{ events_json | tojson }};
+  document.addEventListener('DOMContentLoaded', () => {
+    const cal = new FullCalendar.Calendar(document.getElementById('trackday-cal'), {
+      initialView: 'dayGridMonth',
+      initialDate: '{{ today_iso }}',
+      firstDay: 1,                 // Monday-start week
+      headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
+      buttonText: { listMonth: 'List', today: 'Today', month: 'Month' },
+      height: 'auto',
+      dayMaxEvents: 4,
+      events,
+      eventClick: function (info) {
+        info.jsEvent.preventDefault();
+        if (info.event.url) window.open(info.event.url, '_blank', 'noopener');
+      }
+    });
+    cal.render();
+  });
+</script>
+{% endblock %}
