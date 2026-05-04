@@ -318,10 +318,12 @@
       <a class="brand-gmracing" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a>
     </span>
   </div>
+  {% set _qs = request.url.query %}
+  {% set _q = ('?' ~ _qs) if _qs else '' %}
   <nav class="top-nav">
-    <a href="/">Trackday list</a>
-    <a href="/map">Map</a>
-    <a href="/calendar">Calendar</a>
+    <a href="/{{ _q }}">Trackday list</a>
+    <a href="/map{{ _q }}">Map</a>
+    <a href="/calendar{{ _q }}">Calendar</a>
   </nav>
   {% set _gm = global_meta() %}
   <span class="meta">{{ _gm.count }} events · last refresh {{ _gm.last_run or "never" }}</span>
