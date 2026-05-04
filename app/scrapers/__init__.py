@@ -1,6 +1,7 @@
 from . import (
     msv, javelin, opentrack, circuit_days, silverstone, rma,
     mot, nolimits, goldtrack, msevents, goodwood,
+    slipandgrip, trackobsession,
 )
 
 SCRAPERS = {
@@ -15,6 +16,8 @@ SCRAPERS = {
     "goldtrack": goldtrack,
     "msevents": msevents,
     "goodwood": goodwood,
+    "slipandgrip": slipandgrip,
+    "trackobsession": trackobsession,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -30,4 +33,6 @@ ORGANISER_DISPLAY = {
     "goldtrack": "Goldtrack",
     "msevents": "Motorsport Events",
     "goodwood": "Goodwood Motor Circuit",
+    "slipandgrip": "Slip and Grip Automotive",
+    "trackobsession": "Track Obsession",
 }
