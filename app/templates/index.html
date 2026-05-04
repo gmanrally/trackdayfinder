@@ -36,7 +36,11 @@
   <label>Source
     <select name="source">
       <option value="">All</option>
-      {% for slug, name in sources %}<option value="{{ slug }}" {% if slug == filters.source %}selected{% endif %}>{{ name }}</option>{% endfor %}
+      {% for group_label, items in sources_grouped %}
+      <optgroup label="{{ group_label }}">
+        {% for slug, name in items %}<option value="{{ slug }}" {% if slug == filters.source %}selected{% endif %}>{{ name }}</option>{% endfor %}
+      </optgroup>
+      {% endfor %}
     </select>
   </label>
   <label>Dates
@@ -114,11 +118,20 @@
       <td><a href="/circuit/{{ e.circuit | slugify }}">{{ e.circuit }}</a></td>
       <td>{% if e.session and e.session != 'day' %}<span class="pill" style="background:#fef3c7;color:#92400e">{{ e.session }}</span>{% else %}<span style="color:var(--muted-2)">{{ e.session or '' }}</span>{% endif %}</td>
       <td><a href="/organiser/{{ e.source }}">{{ e.organiser }}</a></td>
-      <td>{{ e.title or '' }}</td>
+      <td>{{ e.title or '' }}{% if e.is_package %} <span class="pill" style="background:#dbeafe;color:#1e40af">package</span>{% endif %}</td>
       <td>{{ e.vehicle_type or '' }}</td>
       <td>{{ e.group_level or '' }}</td>
       <td>{{ e.noise_limit_db ~ ' dB' if e.noise_limit_db else '' }}</td>
-      <td class="right">{{ '£%.0f' % e.price_gbp if e.price_gbp else '' }}</td>
+      <td class="right">
+        {%- if e.price_gbp -%}
+          {%- if e.currency == 'EUR' -%}
+            <span title="Approx. {{ e.currency }} {{ '%.0f' % e.price_native }} converted at indicative rate">£{{ '%.0f' % e.price_gbp }}*</span>
+            <div style="font-size:11px;color:var(--muted)">€{{ '%.0f' % e.price_native }}</div>
+          {%- else -%}
+            £{{ '%.0f' % e.price_gbp }}
+          {%- endif -%}
+        {%- endif -%}
+      </td>
       <td>
         {%- if e.sold_out -%}
           <span class="pill" style="background:#1f2937;color:#fff">Sold out</span>

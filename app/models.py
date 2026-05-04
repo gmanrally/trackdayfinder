@@ -23,10 +23,14 @@ class Event(SQLModel, table=True):
     group_level: Optional[str] = None            # novice / inter / open / mixed
     session: Optional[str] = Field(default=None, index=True)  # day / evening / am / pm / am_pm
     noise_limit_db: Optional[int] = None
-    price_gbp: Optional[float] = None
+    price_gbp: Optional[float] = None        # canonical / converted price for sort/filter
+    price_native: Optional[float] = None      # original price as scraped
+    currency: str = Field(default="GBP")      # ISO of price_native ("GBP"/"EUR")
     spaces_left: Optional[int] = None
     sold_out: bool = False
-    stock_status: Optional[str] = None   # raw badge text: "Low Stock", "7 Places Left", "Sold Out"
+    stock_status: Optional[str] = None        # "Low Stock", "7 Places Left", "Sold Out"
+    is_package: bool = Field(default=False, index=True)
+    region: str = Field(default="UK", index=True)  # "UK" or "EU"
     booking_url: str
     title: Optional[str] = None
     notes: Optional[str] = None

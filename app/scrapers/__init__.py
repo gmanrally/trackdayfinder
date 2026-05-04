@@ -2,6 +2,7 @@ from . import (
     msv, javelin, opentrack, circuit_days, silverstone, rma,
     mot, nolimits, goldtrack, msevents, goodwood,
     slipandgrip, trackobsession,
+    rsr_nurburg,
 )
 
 SCRAPERS = {
@@ -18,6 +19,7 @@ SCRAPERS = {
     "goodwood": goodwood,
     "slipandgrip": slipandgrip,
     "trackobsession": trackobsession,
+    "rsr_nurburg": rsr_nurburg,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -35,4 +37,14 @@ ORGANISER_DISPLAY = {
     "goodwood": "Goodwood Motor Circuit",
     "slipandgrip": "Slip and Grip Automotive",
     "trackobsession": "Track Obsession",
+    "rsr_nurburg": "RSRNurburg (Europe)",
+}
+
+# Region grouping for the dropdown (UK first, EU after).
+SOURCE_REGION = {
+    "msv": "UK", "javelin": "UK", "opentrack": "UK", "circuit_days": "UK",
+    "silverstone": "UK", "rma": "UK", "mot": "UK", "nolimits": "UK",
+    "goldtrack": "UK", "msevents": "UK", "goodwood": "UK",
+    "slipandgrip": "UK", "trackobsession": "UK",
+    "rsr_nurburg": "EU",
 }

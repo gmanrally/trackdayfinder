@@ -27,6 +27,30 @@ CIRCUIT_ALIASES = {
     "goodwood": "Goodwood",
     "llandow": "Llandow",
     "curborough": "Curborough",
+    # ---- Europe ----
+    "spa": "Spa-Francorchamps",
+    "francorchamps": "Spa-Francorchamps",
+    "nurburgring": "Nürburgring",
+    "nürburgring": "Nürburgring",
+    "nordschleife": "Nürburgring (Nordschleife)",
+    "zandvoort": "Zandvoort",
+    "hockenheim": "Hockenheim",
+    "magny-cours": "Magny-Cours",
+    "magny cours": "Magny-Cours",
+    "imola": "Imola",
+    "mugello": "Mugello",
+    "le mans": "Le Mans (Bugatti)",
+    "paul ricard": "Paul Ricard",
+    "navarra": "Circuito de Navarra",
+    "portimao": "Portimão",
+    "portimão": "Portimão",
+    "estoril": "Estoril",
+    "barcelona": "Barcelona-Catalunya",
+    "catalunya": "Barcelona-Catalunya",
+    "monza": "Monza",
+    "assen": "TT Circuit Assen",
+    "valencia": "Valencia (Ricardo Tormo)",
+    "jerez": "Jerez",
 }
 
 
@@ -38,10 +62,14 @@ def canonical_circuit(raw: str) -> str:
     return raw.strip() if raw else "Unknown"
 
 
+# Static EUR -> GBP rate; refreshed manually. UI footer disclaims as indicative.
+EUR_TO_GBP = 0.85
+
+
 def parse_price(text: str) -> float | None:
     if not text:
         return None
-    m = re.search(r"£\s*([\d,]+(?:\.\d+)?)", text)
+    m = re.search(r"[£€]\s*([\d,]+(?:\.\d+)?)", text)
     if not m:
         m = re.search(r"([\d,]+(?:\.\d+)?)", text)
     if not m:
@@ -50,6 +78,17 @@ def parse_price(text: str) -> float | None:
         return float(m.group(1).replace(",", ""))
     except ValueError:
         return None
+
+
+def to_gbp(amount: float | None, currency: str) -> float | None:
+    if amount is None:
+        return None
+    cur = (currency or "GBP").upper()
+    if cur == "GBP":
+        return amount
+    if cur == "EUR":
+        return round(amount * EUR_TO_GBP, 2)
+    return amount  # unknown -> treat as GBP
 
 
 def parse_noise(text: str) -> int | None:

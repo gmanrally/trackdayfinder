@@ -113,11 +113,16 @@ async def index(request: Request,
 
         all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
         circuits = sorted({e.circuit for e in all_events})
-        # Build (slug, display_name) pairs for the Source dropdown.
-        from .scrapers import ORGANISER_DISPLAY
+        # Source dropdown grouped by region: UK organisers, then EU.
+        from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
         source_slugs = sorted({e.source for e in all_events})
-        sources = [(slug, ORGANISER_DISPLAY.get(slug, slug.replace("_", " ").title()))
-                   for slug in source_slugs]
+        def _row(slug):
+            return (slug, ORGANISER_DISPLAY.get(slug, slug.replace("_", " ").title()))
+        sources_grouped = [
+            ("UK organisers", [_row(s) for s in source_slugs if SOURCE_REGION.get(s, "UK") == "UK"]),
+            ("European",      [_row(s) for s in source_slugs if SOURCE_REGION.get(s, "UK") == "EU"]),
+        ]
+        sources_grouped = [g for g in sources_grouped if g[1]]
         sessions = sorted({e.session for e in all_events if e.session})
         last = s.exec(select(ScrapeRun).order_by(ScrapeRun.finished_at.desc())).first()
 
@@ -125,7 +130,7 @@ async def index(request: Request,
         "events": events,
         "count": len(events),
         "circuits": circuits,
-        "sources": sources,
+        "sources_grouped": sources_grouped,
         "sessions": sessions,
         "last_run": last.finished_at.strftime("%Y-%m-%d %H:%M") if last and last.finished_at else None,
         "now_year": today.year,

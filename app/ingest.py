@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime
 from sqlmodel import select
 from .models import Event, ScrapeRun, init_db, session
-from .normalise import canonical_circuit, parse_price, parse_noise, make_dedup_key
+from .normalise import canonical_circuit, parse_price, parse_noise, make_dedup_key, to_gbp
 from .scrapers import SCRAPERS
 
 
@@ -32,13 +32,18 @@ async def run_one(slug: str) -> tuple[int, str | None]:
                 ev.title = raw.title
                 ev.vehicle_type = raw.vehicle_type or "car"
                 ev.group_level = raw.group_level
-                ev.price_gbp = parse_price(raw.price_text or "")
+                native_price = parse_price(raw.price_text or "")
+                ev.price_native = native_price
+                ev.currency = (raw.currency or "GBP").upper()
+                ev.price_gbp = to_gbp(native_price, ev.currency)
                 ev.noise_limit_db = parse_noise(raw.noise_text or "")
                 ev.sold_out = raw.sold_out
                 ev.spaces_left = raw.spaces_left
                 ev.stock_status = raw.stock_status
                 ev.notes = raw.notes
                 ev.session = raw.session
+                ev.is_package = raw.is_package
+                ev.region = raw.region or "UK"
                 ev.last_seen = datetime.utcnow()
                 s.add(ev)
                 n += 1

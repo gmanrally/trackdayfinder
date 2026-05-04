@@ -28,6 +28,9 @@ class RawEvent:
     notes: Optional[str] = None
     session: Optional[str] = None       # day / evening / am / pm / am_pm
     external_id: Optional[str] = None   # source-side id (SKU, slug) — used for dedup
+    currency: str = "GBP"               # ISO of price_text (GBP / EUR)
+    is_package: bool = False            # bundles travel/accommodation
+    region: str = "UK"                  # "UK" or "EU"
 
 
 async def get_html(url: str, timeout: float = 20.0) -> HTMLParser:

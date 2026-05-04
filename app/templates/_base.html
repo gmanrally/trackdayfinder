@@ -175,8 +175,9 @@
   tbody tr:last-child td { border-bottom: none; }
   tr.soldout td { opacity: 0.45; text-decoration: line-through; }
   td.right { text-align: right; }
-  td a { color: var(--accent); font-weight: 600; text-decoration: none; }
-  td a:hover { text-decoration: underline; }
+  /* Table cell links: subtle dark with red hover, not red-by-default. */
+  td a { color: var(--fg); font-weight: 500; text-decoration: none; }
+  td a:hover { color: var(--accent); text-decoration: underline; }
   .book-btn {
     display: inline-block; padding: 6px 14px;
     background: var(--accent); color: #fff !important;
@@ -248,6 +249,8 @@
 <footer style="text-align:center;padding:10px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;background:var(--card)">
   &copy; {{ now_year }} <a class="brand-gmracing brand-gmracing-dark" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a> &middot; All rights reserved.
   Listings aggregated from public organiser sites; bookings handled by the respective organisers.
+  <br>
+  <span style="font-size:11px">* European prices marked with an asterisk are converted from EUR at an indicative rate (1 EUR ≈ 0.85 GBP). Always check the live price on the organiser's site before booking.</span>
 </footer>
 
 {% block jsonld %}{% endblock %}
