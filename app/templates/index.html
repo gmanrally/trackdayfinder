@@ -54,6 +54,9 @@
     font-size: 26px; font-weight: 700; margin: 0;
     color: #ffffff; letter-spacing: -0.015em;
   }
+  .brand-link { display: inline-flex; align-items: center; line-height: 0; }
+  .brand-logo { height: 44px; width: auto; display: block; }
+  @media (max-width: 640px) { .brand-logo { height: 34px; } }
   header .tagline { color: #94a3b8; font-size: 13px; }
   header .tagline a { color: #f8fafc; text-decoration: none; border-bottom: 1px dashed #475569; }
   header .tagline a:hover { color: #fff; border-color: #fff; }
@@ -208,7 +211,9 @@
 </head>
 <body>
 <header>
-  <h1>🏁 TrackdayFinder.co.uk</h1>
+  <a href="/" class="brand-link" aria-label="TrackdayFinder home">
+    <img src="/static/logo-light.svg" alt="TrackdayFinder" class="brand-logo">
+  </a>
   <span class="tagline">kindly provided by
     <a class="brand-gmracing" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a>
   </span>
@@ -372,6 +377,7 @@
   Listings aggregated from public organiser sites; bookings handled by the respective organisers.
   <br>
   <a href="/static/logo.svg" target="_blank">Logo</a> &middot;
+  <a href="/static/logo-light.svg" target="_blank">Logo (white)</a> &middot;
   <a href="/static/logo-light-on-dark.svg" target="_blank">Logo (dark bg)</a> &middot;
   <a href="/static/logo-square.svg" target="_blank">Square icon</a>
 </footer>
