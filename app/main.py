@@ -863,6 +863,21 @@ async def alerts_unsubscribe(request: Request, token: str):
     })
 
 
+@app.get("/favicon.ico")
+async def favicon_legacy():
+    """Legacy /favicon.ico — used by Google's favicon crawler if a real ICO
+    is dropped at /static/favicon.ico we serve that, otherwise fall back to
+    the square SVG (modern browsers can handle either)."""
+    from starlette.responses import FileResponse, RedirectResponse
+    ico = BASE / "static" / "favicon.ico"
+    png = BASE / "static" / "favicon-192.png"
+    if ico.exists():
+        return FileResponse(ico, media_type="image/vnd.microsoft.icon")
+    if png.exists():
+        return FileResponse(png, media_type="image/png")
+    return RedirectResponse("/static/logo-square.svg", status_code=302)
+
+
 @app.get("/sitemap.xml")
 async def sitemap():
     today = date.today()
