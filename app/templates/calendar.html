@@ -93,7 +93,7 @@
     const isMobile = window.matchMedia('(max-width: 720px)').matches;
     const cal = new FullCalendar.Calendar(document.getElementById('trackday-cal'), {
       initialView: isMobile ? 'listMonth' : 'dayGridMonth',
-      initialDate: '{{ today_iso }}',
+      initialDate: '{{ initial_iso or today_iso }}',
       firstDay: 1,                 // Monday-start week
       headerToolbar: isMobile
         ? { left: 'prev,next', center: 'title', right: 'today,listMonth,dayGridMonth' }

@@ -516,12 +516,26 @@ async def calendar_page(request: Request,
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
     weekdays = request.query_params.getlist("weekdays")
     today = date.today()
+    # Pick an initial date for the calendar so it lands on the user's filtered
+    # range. Priority: month filter > from_ filter > earliest matching event > today.
+    initial_iso = today.isoformat()
+    if month:
+        initial_iso = f"{month}-01"
+    elif from_:
+        try: date.fromisoformat(from_); initial_iso = from_
+        except ValueError: pass
     with db_session() as s:
         q, _ = _filtered_events_query(circuit, vehicle, source, session,
                                       from_, to, max_price, hide_sold_out, sort=None,
                                       weekdays=weekdays, month=month)
         events = s.exec(q).all()
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
+    # If no explicit date filter set but other filters narrow events, jump to
+    # the earliest matching one so the user actually sees results immediately.
+    if initial_iso == today.isoformat() and events:
+        earliest = min(e.event_date for e in events)
+        if earliest > today:
+            initial_iso = earliest.isoformat()
 
     # Build events array for FullCalendar
     events_json = []
@@ -563,6 +577,7 @@ async def calendar_page(request: Request,
         "events_json": events_json,
         "now_year": today.year,
         "today_iso": today.isoformat(),
+        "initial_iso": initial_iso,
         "circuits": circuits,
         "sources_grouped": sources_grouped,
         "sessions": sessions,
