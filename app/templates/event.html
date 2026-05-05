@@ -35,6 +35,15 @@
 
   {% if e.notes %}<p style="color:var(--muted);font-style:italic">{{ e.notes }}</p>{% endif %}
 
+  <h2>Get an email alert for this event</h2>
+  <p style="color:var(--muted);font-size:13px">We'll email you if the price drops, it sells out, becomes available again, or is running low on space.</p>
+  <form method="post" action="/alerts" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;max-width:520px">
+    <input type="hidden" name="event" value="{{ e.id }}">
+    <input type="email" name="email" required placeholder="you@example.com"
+           style="flex:1;min-width:200px;padding:8px 10px;border:1px solid var(--line-2);border-radius:6px;font-size:14px">
+    <button type="submit" class="book-btn" style="padding:9px 16px">Watch this event →</button>
+  </form>
+
   {% if history|length > 1 %}
   <h2>Price history</h2>
   <p style="color:var(--muted);font-size:13px">{{ history|length }} snapshots since we started tracking this event.</p>

@@ -15,6 +15,13 @@ EXTERNAL_CIRCUITS: set[str] = {
     "Bishopscourt",      # NI bike circuit, runs days via clubs, no public feed
 }
 
+# Region tagging for external venues — used so the map's red "?" markers
+# respect a UK/EU region filter even when there are no scraped events.
+EXTERNAL_REGION: dict[str, str] = {
+    "Mondello Park": "UK",   # RoI but treated as UK-area for trackday context
+    "Bishopscourt":  "UK",
+}
+
 CIRCUIT_COORDS: dict[str, tuple[float, float]] = {
     # ===== UK =====
     "Silverstone":          (52.0717, -1.0167),

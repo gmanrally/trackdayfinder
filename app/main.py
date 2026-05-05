@@ -1,9 +1,9 @@
 from __future__ import annotations
+import os
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
-
-import re
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -11,12 +11,15 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from .models import Event, ScrapeRun, Click, init_db, session as db_session
+from .models import Event, ScrapeRun, Click, User, Watch, AlertSent, init_db, session as db_session
 from . import ingest
 
 BASE = Path(__file__).resolve().parent
 
 CANONICAL_HOST = "https://trackdayfinder.co.uk"
+
+# Feature flags. Hidden from public unless explicitly enabled.
+ALERTS_ENABLED = os.environ.get("ALERTS_ENABLED", "").strip() == "1"
 
 
 def slugify(s: str) -> str:
@@ -43,6 +46,7 @@ def _global_meta() -> dict:
     }
 
 templates.env.globals["global_meta"] = _global_meta
+templates.env.globals["alerts_enabled"] = ALERTS_ENABLED
 
 app = FastAPI(title="TrackdayFinder")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
@@ -123,6 +127,39 @@ async def slim_for_link_bots(request: Request, call_next):
     })
 
 
+def _build_month_choices(events) -> list[tuple[str, str]]:
+    """Return list of (value="YYYY-MM", label) for months that have at least
+    one upcoming event. Labels are bare month names ("May") unless the same
+    month occurs in multiple years (then "May 26" / "May 27") — keeps the chip
+    bar compact while staying unambiguous."""
+    months: dict[str, set[int]] = {}   # "May" -> {2026, 2027}
+    keys: dict[str, str] = {}          # "2026-05" -> "May"
+    for e in events:
+        key = e.event_date.strftime("%Y-%m")
+        name = e.event_date.strftime("%B")
+        if key in keys:
+            continue
+        keys[key] = name
+        months.setdefault(name, set()).add(e.event_date.year)
+    out: list[tuple[str, str]] = []
+    for k in sorted(keys):
+        name = keys[k]
+        years = months[name]
+        if len(years) > 1:
+            year_short = k.split("-")[0][-2:]
+            label = f"{name[:3]} {year_short}"
+        else:
+            label = name
+        out.append((k, label))
+    return out
+
+
+WEEKDAY_CHOICES = [
+    ("Mon", "Mon"), ("Tue", "Tue"), ("Wed", "Wed"), ("Thu", "Thu"),
+    ("Fri", "Fri"), ("Sat", "Sat"), ("Sun", "Sun"),
+]
+
+
 def _qs_no_sort(request: Request) -> str:
     """Current query string with the `sort` param stripped, urlencoded.
     Used by sort-link template macro so clicking a column preserves filters."""
@@ -136,9 +173,15 @@ INDEX_PAGE_DAYS = 30
 
 
 def _filtered_events_query(circuit, vehicle, source, session,
-                           from_, to, max_price, hide_sold_out, sort):
+                           from_, to, max_price, hide_sold_out, sort,
+                           weekdays=None, month=None):
     """Build a select(Event) with all user filters + the chosen sort applied.
-    Returns (query, sort_key) — caller handles execution."""
+    Returns (query, sort_key) — caller handles execution.
+
+    weekdays: list of 'Mon'|'Tue'|... (or 0..6 ints, Mon=0); only events whose
+              `event_date.weekday()` matches will pass.
+    month:    'YYYY-MM' string. Constrains to that calendar month."""
+    from sqlmodel import func as _func
     today = date.today()
     q = select(Event).where(Event.event_date >= today)
     if circuit:
@@ -164,6 +207,31 @@ def _filtered_events_query(circuit, vehicle, source, session,
         except ValueError: pass
     if hide_sold_out:
         q = q.where(Event.sold_out == False)  # noqa: E712
+    # Month — accept "YYYY-MM"
+    if month:
+        try:
+            y, m = month.split("-")
+            y, m = int(y), int(m)
+            from calendar import monthrange
+            first = date(y, m, 1)
+            last  = date(y, m, monthrange(y, m)[1])
+            q = q.where(Event.event_date >= first, Event.event_date <= last)
+        except (ValueError, IndexError):
+            pass
+    # Weekdays — SQLite: strftime('%w', date) gives 0..6 with 0=Sunday.
+    # We accept names ('Mon'..'Sun') or ints (0=Mon..6=Sun, Python convention).
+    if weekdays:
+        py_to_sqlite = {0: "1", 1: "2", 2: "3", 3: "4", 4: "5", 5: "6", 6: "0"}
+        names = {"mon":0,"tue":1,"wed":2,"thu":3,"fri":4,"sat":5,"sun":6}
+        sqlite_codes = []
+        for w in weekdays:
+            w = (w or "").strip().lower()
+            if w in names:
+                sqlite_codes.append(py_to_sqlite[names[w]])
+            elif w.isdigit() and 0 <= int(w) <= 6:
+                sqlite_codes.append(py_to_sqlite[int(w)])
+        if sqlite_codes:
+            q = q.where(_func.strftime("%w", Event.event_date).in_(sqlite_codes))
 
     from sqlmodel import asc, desc as sql_desc
     sort_key = (sort or "date").lower()
@@ -190,6 +258,13 @@ async def _startup() -> None:
     hour = int(os.environ.get("TRACKDAYFINDER_REFRESH_HOUR", "3"))
     minute = int(os.environ.get("TRACKDAYFINDER_REFRESH_MINUTE", "0"))
     scheduler.add_job(ingest.run_all, "cron", hour=hour, minute=minute, id="refresh")
+    # Daily digest at 06:00 — 3 hours after the 03:00 refresh — only when
+    # alerts are enabled via env var (otherwise no users to digest anyway).
+    if ALERTS_ENABLED:
+        digest_hour = int(os.environ.get("TRACKDAYFINDER_DIGEST_HOUR", "6"))
+        digest_minute = int(os.environ.get("TRACKDAYFINDER_DIGEST_MINUTE", "0"))
+        from . import alerts as _alerts
+        scheduler.add_job(_alerts.run_digests, "cron", hour=digest_hour, minute=digest_minute, id="digests")
     scheduler.start()
 
 
@@ -204,7 +279,9 @@ async def index(request: Request,
                 max_price: Optional[str] = None,
                 hide_sold_out: Optional[str] = None,
                 sort: Optional[str] = None,
-                from_offset: Optional[str] = None):
+                from_offset: Optional[str] = None,
+                month: Optional[str] = None):
+    weekdays = request.query_params.getlist("weekdays")
     today = date.today()
     # `from_offset` is the JS pagination cursor — number of days from today
     # where the visible window starts. Default 0 → show today .. today+30d.
@@ -217,18 +294,23 @@ async def index(request: Request,
 
     with db_session() as s:
         q, sort_key = _filtered_events_query(circuit, vehicle, source, session,
-                                             from_, to, max_price, hide_sold_out, sort)
-        # Apply the 30-day pagination window on top of user filters.
-        windowed = q.where(Event.event_date < win_end, Event.event_date >= win_start)
+                                             from_, to, max_price, hide_sold_out, sort,
+                                             weekdays=weekdays, month=month)
+        # If user picked a specific month, skip the rolling 30-day window —
+        # just show everything that month.
+        if month:
+            windowed = q
+            has_more = False
+        else:
+            windowed = q.where(Event.event_date < win_end, Event.event_date >= win_start)
+            beyond = s.exec(q.where(Event.event_date >= win_end).limit(1)).first()
+            has_more = beyond is not None
         events = s.exec(windowed).all()
         # Total matching the user's filters (no pagination) — for the count pill.
         from sqlmodel import func
         total_count = s.exec(select(func.count()).select_from(q.subquery())).one()
         if isinstance(total_count, tuple):
             total_count = total_count[0]
-        # Are there more events past this window?
-        beyond = s.exec(q.where(Event.event_date >= win_end).limit(1)).first()
-        has_more = beyond is not None
 
         all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
 
@@ -262,6 +344,7 @@ async def index(request: Request,
         ]
         sources_grouped = [g for g in sources_grouped if g[1]]
         sessions = sorted({e.session for e in all_events if e.session})
+        months = _build_month_choices(all_events)
         last = s.exec(select(ScrapeRun).order_by(ScrapeRun.finished_at.desc())).first()
 
     return templates.TemplateResponse(request, "index.html", {
@@ -273,6 +356,8 @@ async def index(request: Request,
         "circuits": circuits,
         "sources_grouped": sources_grouped,
         "sessions": sessions,
+        "months": months,
+        "weekday_choices": WEEKDAY_CHOICES,
         "last_run": last.finished_at.strftime("%Y-%m-%d %H:%M") if last and last.finished_at else None,
         "now_year": today.year,
         "today_iso": today.isoformat(),
@@ -282,6 +367,8 @@ async def index(request: Request,
             "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "weekdays": list(weekdays),
+            "month": month,
         },
     })
 
@@ -297,9 +384,11 @@ async def index_chunk(request: Request,
                       max_price: Optional[str] = None,
                       hide_sold_out: Optional[str] = None,
                       sort: Optional[str] = None,
-                      from_offset: Optional[str] = None):
+                      from_offset: Optional[str] = None,
+                      month: Optional[str] = None):
     """Returns rendered <tr>s for the next 30-day window, plus a has_more flag.
     Used by the index page's infinite-scroll JS."""
+    weekdays = request.query_params.getlist("weekdays")
     today = date.today()
     try:
         offset = max(0, int(from_offset or 0))
@@ -310,11 +399,16 @@ async def index_chunk(request: Request,
 
     with db_session() as s:
         q, _ = _filtered_events_query(circuit, vehicle, source, session,
-                                      from_, to, max_price, hide_sold_out, sort)
-        events = s.exec(q.where(Event.event_date < win_end,
-                                Event.event_date >= win_start)).all()
-        beyond = s.exec(q.where(Event.event_date >= win_end).limit(1)).first()
-        has_more = beyond is not None
+                                      from_, to, max_price, hide_sold_out, sort,
+                                      weekdays=weekdays, month=month)
+        if month:
+            events = s.exec(q).all()
+            has_more = False
+        else:
+            events = s.exec(q.where(Event.event_date < win_end,
+                                    Event.event_date >= win_start)).all()
+            beyond = s.exec(q.where(Event.event_date >= win_end).limit(1)).first()
+            has_more = beyond is not None
 
     tmpl = templates.env.get_template("_event_row.html")
     html = "".join(tmpl.render(e=ev, request=request) for ev in events)
@@ -416,30 +510,17 @@ async def calendar_page(request: Request,
                         from_: Optional[str] = None,
                         to: Optional[str] = None,
                         max_price: Optional[str] = None,
-                        hide_sold_out: Optional[str] = None):
+                        hide_sold_out: Optional[str] = None,
+                        month: Optional[str] = None):
     """Month-grid calendar view of all upcoming events. Same filters as index."""
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
+    weekdays = request.query_params.getlist("weekdays")
     today = date.today()
     with db_session() as s:
-        q = select(Event).where(Event.event_date >= today)
-        if circuit:                     q = q.where(Event.circuit == circuit)
-        if vehicle:                     q = q.where(Event.vehicle_type == vehicle)
-        if source == "region-uk":       q = q.where(Event.region == "UK")
-        elif source == "region-eu":     q = q.where(Event.region == "EU")
-        elif source:                    q = q.where(Event.source == source)
-        if session:                     q = q.where(Event.session == session)
-        if from_:
-            try: q = q.where(Event.event_date >= date.fromisoformat(from_))
-            except ValueError: pass
-        if to:
-            try: q = q.where(Event.event_date <= date.fromisoformat(to))
-            except ValueError: pass
-        if max_price:
-            try: q = q.where(Event.price_gbp <= float(max_price))
-            except ValueError: pass
-        if hide_sold_out:
-            q = q.where(Event.sold_out == False)  # noqa: E712
-        events = s.exec(q.order_by(Event.event_date)).all()
+        q, _ = _filtered_events_query(circuit, vehicle, source, session,
+                                      from_, to, max_price, hide_sold_out, sort=None,
+                                      weekdays=weekdays, month=month)
+        events = s.exec(q).all()
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
 
     # Build events array for FullCalendar
@@ -476,6 +557,7 @@ async def calendar_page(request: Request,
     ]
     sources_grouped = [g for g in sources_grouped if g[1]]
     sessions = sorted({e.session for e in all_events_today if e.session})
+    months = _build_month_choices(all_events_today)
 
     return templates.TemplateResponse(request, "calendar.html", {
         "events_json": events_json,
@@ -484,10 +566,14 @@ async def calendar_page(request: Request,
         "circuits": circuits,
         "sources_grouped": sources_grouped,
         "sessions": sessions,
+        "months": months,
+        "weekday_choices": WEEKDAY_CHOICES,
         "filters": {
             "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "weekdays": list(weekdays),
+            "month": month,
         },
     })
 
@@ -501,38 +587,19 @@ async def map_page(request: Request,
                    from_: Optional[str] = None,
                    to: Optional[str] = None,
                    max_price: Optional[str] = None,
-                   hide_sold_out: Optional[str] = None):
+                   hide_sold_out: Optional[str] = None,
+                   month: Optional[str] = None):
     """Interactive map of UK + EU circuits with upcoming events.
     Honours the same filter set as the index calendar."""
     from collections import Counter
     from .circuit_coords import CIRCUIT_COORDS
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
+    weekdays = request.query_params.getlist("weekdays")
     today = date.today()
     with db_session() as s:
-        q = select(Event).where(Event.event_date >= today)
-        if circuit:
-            q = q.where(Event.circuit == circuit)
-        if vehicle:
-            q = q.where(Event.vehicle_type == vehicle)
-        if source == "region-uk":
-            q = q.where(Event.region == "UK")
-        elif source == "region-eu":
-            q = q.where(Event.region == "EU")
-        elif source:
-            q = q.where(Event.source == source)
-        if session:
-            q = q.where(Event.session == session)
-        if from_:
-            try: q = q.where(Event.event_date >= date.fromisoformat(from_))
-            except ValueError: pass
-        if to:
-            try: q = q.where(Event.event_date <= date.fromisoformat(to))
-            except ValueError: pass
-        if max_price:
-            try: q = q.where(Event.price_gbp <= float(max_price))
-            except ValueError: pass
-        if hide_sold_out:
-            q = q.where(Event.sold_out == False)  # noqa: E712
+        q, _ = _filtered_events_query(circuit, vehicle, source, session,
+                                      from_, to, max_price, hide_sold_out, sort=None,
+                                      weekdays=weekdays, month=month)
         events = s.exec(q).all()
 
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
@@ -555,8 +622,27 @@ async def map_page(request: Request,
     ]
     sources_grouped = [g for g in sources_grouped if g[1]]
     sessions = sorted({e.session for e in all_events_today if e.session})
+    months = _build_month_choices(all_events_today)
 
-    from .circuit_coords import CIRCUIT_WEBSITES, EXTERNAL_CIRCUITS
+    from .circuit_coords import CIRCUIT_WEBSITES, EXTERNAL_CIRCUITS, EXTERNAL_REGION
+    # External venues have no scraped events — decide if they can plausibly
+    # match the active filter set. If not, hide them so the map doesn't
+    # mislead the user into thinking the filter applies.
+    def _external_passes(name: str) -> bool:
+        # Specific source picked → external venues have no events from any source.
+        if source and source not in ("region-uk", "region-eu"):
+            return False
+        # Region: must match if a region filter is set.
+        if source == "region-uk" and EXTERNAL_REGION.get(name) != "UK": return False
+        if source == "region-eu" and EXTERNAL_REGION.get(name) != "EU": return False
+        # Specific circuit picked → only that circuit's external marker.
+        if circuit and circuit != name: return False
+        # Date / month / weekday filters set → we don't know external dates;
+        # hide rather than mislead.
+        if from_ or to or month: return False
+        if weekdays: return False
+        # Vehicle: external venues run mixed; pass.
+        return True
     counts = Counter(e.circuit for e in events)
     next_dates: dict[str, str] = {}
     next_events: dict[str, list[dict]] = {}   # circuit -> up to 5 next events
@@ -588,10 +674,20 @@ async def map_page(request: Request,
             "website": CIRCUIT_WEBSITES.get(circuit_name),
         }
         if circuit_name in EXTERNAL_CIRCUITS:
-            external_points.append(marker)
+            if _external_passes(circuit_name):
+                external_points.append(marker)
+            # else: silently drop — filter wouldn't realistically include them
         elif n > 0:
             points.append(marker)
         else:
+            # Same logic for greyed-out inactive markers: if a specific source
+            # or circuit-restricting filter is on, hide them too.
+            if source and source not in ("region-uk", "region-eu"):
+                continue
+            if circuit and circuit != circuit_name:
+                continue
+            if from_ or to or month or weekdays:
+                continue
             inactive_points.append(marker)
 
     return templates.TemplateResponse(request, "map.html", {
@@ -603,11 +699,152 @@ async def map_page(request: Request,
         "circuits": circuits,
         "sources_grouped": sources_grouped,
         "sessions": sessions,
+        "months": months,
+        "weekday_choices": WEEKDAY_CHOICES,
         "filters": {
             "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
         },
+    })
+
+
+# ============ Email alerts ============
+
+@app.get("/alerts", response_class=HTMLResponse)
+async def alerts_signup(request: Request):
+    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    """Landing/signup page — pick what to watch + enter email."""
+    today = date.today()
+    with db_session() as s:
+        rows = s.exec(select(Event).where(Event.event_date >= today)).all()
+    circuits = sorted({e.circuit for e in rows})
+    from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
+    source_slugs = sorted({e.source for e in rows})
+    sources_grouped = [
+        ("UK organisers", [(s, ORGANISER_DISPLAY.get(s, s)) for s in source_slugs if SOURCE_REGION.get(s, "UK") == "UK"]),
+        ("European",      [(s, ORGANISER_DISPLAY.get(s, s)) for s in source_slugs if SOURCE_REGION.get(s, "UK") == "EU"]),
+    ]
+    sources_grouped = [g for g in sources_grouped if g[1]]
+    return templates.TemplateResponse(request, "alerts/signup.html", {
+        "circuits": circuits, "sources_grouped": sources_grouped,
+        "now_year": today.year, "submitted": False,
+    })
+
+
+@app.post("/alerts", response_class=HTMLResponse)
+async def alerts_submit(request: Request):
+    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import get_or_create_user, add_watch, send_confirmation
+    form = await request.form()
+    email = (form.get("email") or "").strip().lower()
+    if "@" not in email or "." not in email:
+        return HTMLResponse("<p>Invalid email. <a href='/alerts'>Try again</a>.</p>", status_code=400)
+    circuits = form.getlist("circuit")
+    sources  = form.getlist("source")
+    events   = form.getlist("event")           # one or more Event.id values
+    if not circuits and not sources and not events:
+        return HTMLResponse("<p>Pick at least one circuit, organiser, or event. <a href='/alerts'>Back</a>.</p>", status_code=400)
+
+    user, created = get_or_create_user(email)
+    for c in circuits:
+        add_watch(user.id, "circuit", c)
+    for s_ in sources:
+        add_watch(user.id, "source", s_)
+    # Event watches: validate each id exists, take its title for the summary.
+    event_titles: list[str] = []
+    if events:
+        with db_session() as ses:
+            for ev_id in events:
+                if not ev_id.isdigit():
+                    continue
+                ev = ses.exec(select(Event).where(Event.id == int(ev_id))).first()
+                if not ev:
+                    continue
+                add_watch(user.id, "event", ev_id)
+                event_titles.append(f"{ev.event_date:%d %b %Y} · {ev.circuit}")
+
+    parts = []
+    if circuits:
+        parts.append("Circuits: " + ", ".join(circuits))
+    if sources:
+        parts.append("Organisers: " + ", ".join(sources))
+    if event_titles:
+        parts.append("Events: " + " · ".join(event_titles))
+    send_confirmation(user, " · ".join(parts))
+
+    today = date.today()
+    return templates.TemplateResponse(request, "alerts/submitted.html", {
+        "email": email, "now_year": today.year,
+    })
+
+
+@app.get("/alerts/confirm/{token}", response_class=HTMLResponse)
+async def alerts_confirm(request: Request, token: str):
+    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import find_user_by_token
+    user = find_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    with db_session() as s:
+        u = s.exec(select(User).where(User.id == user.id)).first()
+        u.confirmed = True
+        s.commit()
+    return templates.TemplateResponse(request, "alerts/confirmed.html", {
+        "user": user, "now_year": date.today().year,
+    })
+
+
+@app.get("/alerts/manage/{token}", response_class=HTMLResponse)
+async def alerts_manage(request: Request, token: str):
+    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import find_user_by_token
+    user = find_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=404, detail="Invalid link")
+    with db_session() as s:
+        watches = s.exec(select(Watch).where(Watch.user_id == user.id)).all()
+        # Resolve event watches to readable titles
+        event_titles: dict[str, str] = {}
+        for w in watches:
+            if w.kind == "event" and w.value.isdigit():
+                ev = s.exec(select(Event).where(Event.id == int(w.value))).first()
+                if ev:
+                    event_titles[w.value] = f"{ev.event_date:%d %b %Y} · {ev.circuit} · {ev.organiser}"
+    return templates.TemplateResponse(request, "alerts/manage.html", {
+        "user": user, "watches": watches, "event_titles": event_titles,
+        "now_year": date.today().year,
+    })
+
+
+@app.post("/alerts/manage/{token}/remove/{watch_id}")
+async def alerts_remove_watch(request: Request, token: str, watch_id: int):
+    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import find_user_by_token, remove_watch
+    from starlette.responses import RedirectResponse
+    user = find_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=404)
+    remove_watch(watch_id, user.id)
+    return RedirectResponse(f"/alerts/manage/{token}", status_code=303)
+
+
+@app.get("/alerts/unsubscribe/{token}", response_class=HTMLResponse)
+async def alerts_unsubscribe(request: Request, token: str):
+    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import find_user_by_token
+    user = find_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=404)
+    with db_session() as s:
+        u = s.exec(select(User).where(User.id == user.id)).first()
+        # Delete watches; keep user row for audit but mark unconfirmed.
+        for w in s.exec(select(Watch).where(Watch.user_id == user.id)).all():
+            s.delete(w)
+        u.confirmed = False
+        s.commit()
+    return templates.TemplateResponse(request, "alerts/unsubscribed.html", {
+        "now_year": date.today().year,
     })
 
 

@@ -55,6 +55,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd in ("audit-coords", "audit"):
         return _audit_coords()
+    if cmd == "send-digests":
+        from . import alerts
+        n = alerts.run_digests()
+        print(f"sent {n} digest{'s' if n != 1 else ''}")
+        return 0
     print(f"unknown command '{cmd}'")
     return 2
 

@@ -1,0 +1,39 @@
+{% extends "_base.html" %}
+
+{% block title %}Manage alerts — TrackdayFinder.co.uk{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>Your alerts</h1>
+  <p class="lede">{{ user.email }} · {% if user.confirmed %}<span style="color:#0f766e">Confirmed</span>{% else %}<span style="color:#c2410c">Not yet confirmed</span>{% endif %}</p>
+
+  {% if watches %}
+  <h2>Watching</h2>
+  <ul style="list-style:none;padding:0;display:grid;gap:6px;max-width:520px">
+    {% for w in watches %}
+    <li style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fff;border:1px solid var(--line);border-radius:6px">
+      <span>
+        <span class="pill">{{ w.kind }}</span>
+        {%- if w.kind == 'event' -%}
+          {{ event_titles.get(w.value, 'Event #' ~ w.value) }}
+        {%- else -%}
+          {{ w.value }}
+        {%- endif -%}
+      </span>
+      <form method="post" action="/alerts/manage/{{ user.token }}/remove/{{ w.id }}" style="margin:0">
+        <button type="submit" style="background:none;border:0;color:var(--accent);cursor:pointer;font-size:13px">Remove</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p style="color:var(--muted)">You haven't selected anything to watch. <a href="/alerts">Add some</a>.</p>
+  {% endif %}
+
+  <h2 style="margin-top:28px">Add more</h2>
+  <p><a class="book-btn" href="/alerts">Watch more circuits or organisers →</a></p>
+
+  <h2 style="margin-top:28px">Stop receiving alerts</h2>
+  <p><a href="/alerts/unsubscribe/{{ user.token }}" style="color:var(--muted)">Unsubscribe and remove all watches →</a></p>
+</article>
+{% endblock %}

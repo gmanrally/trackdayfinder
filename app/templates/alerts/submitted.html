@@ -1,0 +1,11 @@
+{% extends "_base.html" %}
+
+{% block title %}Check your email — TrackdayFinder alerts{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>Check your email</h1>
+  <p class="lede">We've sent a confirmation link to <strong>{{ email }}</strong>. Click it and your alerts are live.</p>
+  <p>If it doesn't arrive in 5 minutes, check your spam folder, or <a href="/alerts">try again</a>.</p>
+</article>
+{% endblock %}

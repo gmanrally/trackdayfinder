@@ -1,4 +1,6 @@
 {# Reusable filters bar. Set form_action to override (defaults to current page). #}
+{# Mobile-only "Filters" toggle button — opens a sticky drawer of all controls. #}
+<button type="button" id="mobile-filters-toggle" class="mobile-filters-toggle">Filters ▾</button>
 <form class="filters" method="get" action="{{ form_action or request.url.path }}">
   <label>Circuit
     <select name="circuit">
@@ -31,33 +33,169 @@
       {% endfor %}
     </select>
   </label>
-  <label>Dates
-    <input id="date-range" type="text" placeholder="Any date" autocomplete="off" style="width:200px;cursor:pointer">
+  {# ------ "When" combined popover: dates + month + weekdays in one button ------ #}
+  <label style="position:relative">When
+    <button type="button" id="when-trigger" class="when-btn">
+      <span id="when-summary">Any time</span>
+      <span style="margin-left:6px;color:var(--muted-2)">▾</span>
+    </button>
+    <div id="when-pop" class="when-pop" hidden>
+      <div class="when-section">
+        <div class="when-label">Date range</div>
+        <input id="date-range" type="text" placeholder="Any date" autocomplete="off">
+      </div>
+      <div class="when-section">
+        <div class="when-label">Month</div>
+        <div id="when-months" class="when-chips">
+          <button type="button" class="when-chip" data-month="">Any</button>
+          {% for val, label in (months or []) %}
+            <button type="button" class="when-chip" data-month="{{ val }}">{{ label }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="when-section">
+        <div class="when-label">Weekdays</div>
+        <div id="when-weekdays" class="when-chips">
+          {% for val, label in (weekday_choices or []) %}
+          <button type="button" class="when-chip when-day" data-weekday="{{ val }}">{{ label[0] }}</button>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-top:1px solid var(--line)">
+        <button type="button" id="when-clear" class="btn-clear" style="font-size:12px;padding:5px 10px">Clear</button>
+        <button type="button" id="when-apply" class="book-btn" style="font-size:12px;padding:5px 14px">Apply</button>
+      </div>
+    </div>
   </label>
   <input type="hidden" id="from-input" name="from_" value="{{ filters.from_ or '' }}">
-  <input type="hidden" id="to-input" name="to" value="{{ filters.to or '' }}">
+  <input type="hidden" id="to-input"   name="to"    value="{{ filters.to or '' }}">
+  <input type="hidden" id="month-input" name="month" value="{{ filters.month or '' }}">
+  {% for d in (filters.weekdays or []) %}<input type="hidden" name="weekdays" value="{{ d }}">{% endfor %}
   <script>
     (function () {
       var fromI = document.getElementById('from-input');
       var toI   = document.getElementById('to-input');
+      var monthI = document.getElementById('month-input');
       var rangeI = document.getElementById('date-range');
+      var trigger = document.getElementById('when-trigger');
+      var pop = document.getElementById('when-pop');
+      var summary = document.getElementById('when-summary');
       var todayIso = '{{ today_iso }}';
-      var defaults = [];
-      if (fromI.value) defaults.push(fromI.value);
-      if (toI.value)   defaults.push(toI.value);
-      flatpickr(rangeI, {
-        mode: 'range', dateFormat: 'Y-m-d', altInput: true, altFormat: 'd M Y',
-        defaultDate: defaults, minDate: todayIso,
-        onReady: function (_, __, fp) { if (defaults.length === 0) fp.jumpToDate(todayIso); },
-        onChange: function (selectedDates) {
-          fromI.value = selectedDates[0] ? formatISO(selectedDates[0]) : '';
-          toI.value   = selectedDates[1] ? formatISO(selectedDates[1]) : '';
-          if (selectedDates.length === 2) document.querySelector('form.filters').submit();
-        }
-      });
+      var monthLabels = {
+        '{{ "" }}': 'Any',
+        {% for val, label in (months or []) %}'{{ val }}': '{{ label }}',{% endfor %}
+      };
+      // Selected weekdays starts from server-rendered hidden inputs.
+      var selectedDays = new Set([{% for d in (filters.weekdays or []) %}'{{ d }}',{% endfor %}]);
+
       function formatISO(d) {
         return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
       }
+      function refreshSummary() {
+        var parts = [];
+        if (monthI.value) parts.push(monthLabels[monthI.value] || monthI.value);
+        else if (fromI.value && toI.value) {
+          parts.push(rangeI.value || (fromI.value + ' → ' + toI.value));
+        } else if (fromI.value) {
+          parts.push('from ' + (rangeI.value || fromI.value));
+        }
+        if (selectedDays.size) {
+          var order = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+          var picked = order.filter(d => selectedDays.has(d));
+          parts.push(picked.length === 1 ? picked[0] + 's' : picked.join('/'));
+        }
+        summary.textContent = parts.length ? parts.join(' · ') : 'Any time';
+      }
+      function syncWeekdayInputs() {
+        // Remove existing weekdays hidden inputs and re-add per current set.
+        document.querySelectorAll('input[type=hidden][name="weekdays"]').forEach(n => n.remove());
+        var form = document.querySelector('form.filters');
+        selectedDays.forEach(d => {
+          var i = document.createElement('input');
+          i.type='hidden'; i.name='weekdays'; i.value=d;
+          form.appendChild(i);
+        });
+      }
+      function syncMonthChips() {
+        document.querySelectorAll('#when-months .when-chip').forEach(b => {
+          b.classList.toggle('on', (b.dataset.month || '') === monthI.value);
+        });
+      }
+      function syncWeekdayChips() {
+        document.querySelectorAll('#when-weekdays .when-chip').forEach(b => {
+          b.classList.toggle('on', selectedDays.has(b.dataset.weekday));
+        });
+      }
+      // Init flatpickr inside popover, no auto-submit (user clicks Apply).
+      var defaults = [];
+      if (fromI.value) defaults.push(fromI.value);
+      if (toI.value)   defaults.push(toI.value);
+      var fp = flatpickr(rangeI, {
+        mode: 'range', dateFormat: 'Y-m-d', altInput: true, altFormat: 'd M Y',
+        defaultDate: defaults, minDate: todayIso, inline: false,
+        onChange: function (sel) {
+          fromI.value = sel[0] ? formatISO(sel[0]) : '';
+          toI.value   = sel[1] ? formatISO(sel[1]) : '';
+          // Picking a date range clears any selected month
+          if (sel.length) { monthI.value = ''; syncMonthChips(); }
+        }
+      });
+      // Month chip clicks
+      document.getElementById('when-months').addEventListener('click', function (ev) {
+        var b = ev.target.closest('.when-chip'); if (!b) return;
+        monthI.value = b.dataset.month || '';
+        // Picking a month clears any date range
+        if (monthI.value) { fromI.value = ''; toI.value = ''; fp.clear(); }
+        syncMonthChips();
+      });
+      // Weekday letter clicks (toggle)
+      document.getElementById('when-weekdays').addEventListener('click', function (ev) {
+        var b = ev.target.closest('.when-chip'); if (!b) return;
+        var d = b.dataset.weekday;
+        if (selectedDays.has(d)) selectedDays.delete(d); else selectedDays.add(d);
+        syncWeekdayChips();
+      });
+      // Open/close popover. Pop is position:fixed and re-attached to <body>
+      // so it can escape the filter bar's overflow:auto clipping.
+      if (pop.parentNode !== document.body) document.body.appendChild(pop);
+      function positionPop() {
+        var r = trigger.getBoundingClientRect();
+        var w = 340;
+        var left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left));
+        pop.style.left = left + 'px';
+        pop.style.top  = (r.bottom + 6) + 'px';
+      }
+      trigger.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (pop.hidden) {
+          pop.hidden = false;
+          positionPop();
+          syncMonthChips(); syncWeekdayChips();
+        } else {
+          pop.hidden = true;
+        }
+      });
+      window.addEventListener('resize', function () { if (!pop.hidden) positionPop(); });
+      window.addEventListener('scroll', function () { if (!pop.hidden) positionPop(); }, true);
+      document.addEventListener('click', function (ev) {
+        if (!pop.hidden && !pop.contains(ev.target) && !trigger.contains(ev.target)) {
+          pop.hidden = true;
+        }
+      });
+      // Clear button — wipe all "when" state and submit
+      document.getElementById('when-clear').addEventListener('click', function () {
+        fromI.value = ''; toI.value = ''; monthI.value = ''; selectedDays.clear();
+        fp.clear();
+        syncMonthChips(); syncWeekdayChips();
+        syncWeekdayInputs();
+        document.querySelector('form.filters').submit();
+      });
+      // Apply button — write hidden inputs and submit
+      document.getElementById('when-apply').addEventListener('click', function () {
+        syncWeekdayInputs();
+        document.querySelector('form.filters').submit();
+      });
+      refreshSummary();
     })();
   </script>
   <label>Max £ <input type="number" name="max_price" value="{{ filters.max_price or '' }}" style="width:80px"></label>
@@ -75,5 +213,19 @@
     form.querySelectorAll('select, input[type=checkbox]').forEach(function (el) { el.addEventListener('change', submitNow); });
     form.querySelectorAll('input[type=number]').forEach(function (el) { el.addEventListener('input', submitDebounced); });
     document.getElementById('clear-filters').addEventListener('click', function () { window.location = form.getAttribute('action') || '/'; });
+
+    // Mobile drawer toggle
+    var toggle = document.getElementById('mobile-filters-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        document.body.classList.toggle('filters-open');
+      });
+      // Close on outside tap when drawer is open
+      document.addEventListener('click', function (ev) {
+        if (!document.body.classList.contains('filters-open')) return;
+        if (form.contains(ev.target) || toggle.contains(ev.target)) return;
+        document.body.classList.remove('filters-open');
+      });
+    }
   })();
 </script>

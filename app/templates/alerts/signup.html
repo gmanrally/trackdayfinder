@@ -1,0 +1,56 @@
+{% extends "_base.html" %}
+
+{% block title %}Email alerts — TrackdayFinder.co.uk{% endblock %}
+{% block meta_description %}Get a daily digest of new trackdays at the circuits and organisers you care about. Free, no account.{% endblock %}
+
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; Email alerts</nav>{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>Email alerts</h1>
+  <p class="lede">Get a daily digest when new trackdays appear at the circuits or organisers you pick. Free, no account.</p>
+
+  <form method="post" action="/alerts" style="display:grid;gap:18px;max-width:640px">
+    <label style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-weight:600">Your email</span>
+      <input type="email" name="email" required placeholder="you@example.com"
+             style="padding:8px 10px;border:1px solid var(--line-2);border-radius:6px;font-size:14px">
+    </label>
+
+    <fieldset style="border:1px solid var(--line);border-radius:6px;padding:14px">
+      <legend style="padding:0 6px;font-weight:600;font-size:13px">Watch circuits</legend>
+      <p style="color:var(--muted);font-size:12px;margin:0 0 8px">Tick any number — you'll be alerted when new dates are added at these circuits.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;font-size:13px">
+        {% for c in circuits %}
+        <label style="display:flex;align-items:center;gap:6px">
+          <input type="checkbox" name="circuit" value="{{ c }}"> {{ c }}
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <fieldset style="border:1px solid var(--line);border-radius:6px;padding:14px">
+      <legend style="padding:0 6px;font-weight:600;font-size:13px">Watch organisers</legend>
+      <p style="color:var(--muted);font-size:12px;margin:0 0 8px">All events from these organisers, regardless of circuit.</p>
+      {% for group_label, items in sources_grouped %}
+      <div style="margin-top:8px;font-weight:600;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">{{ group_label }}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;font-size:13px">
+        {% for slug, name in items %}
+        <label style="display:flex;align-items:center;gap:6px">
+          <input type="checkbox" name="source" value="{{ slug }}"> {{ name }}
+        </label>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </fieldset>
+
+    <button type="submit" class="book-btn" style="padding:10px 22px;font-size:14px;justify-self:start">
+      Send me a confirmation email →
+    </button>
+    <p style="font-size:12px;color:var(--muted);margin:0">
+      We send one email per day at most, only when something matching your watches has changed.
+      Unsubscribe at any time from any email.
+    </p>
+  </form>
+</article>
+{% endblock %}

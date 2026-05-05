@@ -1,0 +1,11 @@
+{% extends "_base.html" %}
+
+{% block title %}Alerts confirmed — TrackdayFinder.co.uk{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>You're in 🏁</h1>
+  <p class="lede">Alerts are now active for <strong>{{ user.email }}</strong>. Your first digest will arrive within 24 hours if anything changes.</p>
+  <p><a class="book-btn" href="/alerts/manage/{{ user.token }}">Manage your watches</a></p>
+</article>
+{% endblock %}

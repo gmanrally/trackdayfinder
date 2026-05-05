@@ -154,6 +154,45 @@
   form.filters button.btn-clear { background: #fff; color: var(--fg); border: 1px solid var(--line-2); }
   form.filters button.btn-clear:hover { background: #f8fafc; border-color: var(--accent); color: var(--accent); }
 
+  /* ===== "When" combined date/month/weekday popover ===== */
+  .when-btn {
+    background:#fff; color:var(--fg); border:1px solid var(--line-2);
+    padding:7px 12px; font-size:13px; font-weight:500; border-radius:6px;
+    cursor:pointer; min-width:160px; text-align:left;
+    display:inline-flex; align-items:center;
+  }
+  .when-btn:hover { border-color:var(--accent); }
+  .when-pop {
+    position:fixed; z-index:9999;
+    background:#fff; border:1px solid var(--line-2); border-radius:8px;
+    box-shadow:0 8px 24px rgba(15,23,42,0.18);
+    width:340px;
+  }
+  .when-pop[hidden] { display:none; }
+  .when-section { padding:10px 12px; border-bottom:1px solid var(--line); }
+  .when-section:last-child { border-bottom:none; }
+  .when-label {
+    font-size:10px; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px;
+  }
+  .when-chips { display:flex; flex-wrap:wrap; gap:4px; }
+  .when-chip {
+    padding:4px 10px; font-size:12px; font-weight:500;
+    background:#f1f5f9; color:var(--fg);
+    border:1px solid transparent; border-radius:6px;
+    cursor:pointer; min-width:34px; text-align:center;
+  }
+  .when-chip:hover { background:#e2e8f0; }
+  .when-chip.on {
+    background:var(--accent); color:#fff;
+    border-color:var(--accent);
+  }
+  .when-day { width:30px; padding:4px 0; }
+  .when-pop input#date-range {
+    width:100%; padding:6px 8px; font-size:13px;
+    border:1px solid var(--line-2); border-radius:6px;
+  }
+
   /* Article (event/circuit/organiser pages) */
   .page {
     flex: 1 1 auto; overflow-y: auto;
@@ -238,6 +277,9 @@
   footer { flex: 0 0 auto; }
   footer a { color: var(--accent) !important; text-decoration: none; }
   footer a:hover { text-decoration: underline; }
+  /* Mobile filters toggle — only shown < 720px */
+  .mobile-filters-toggle { display: none; }
+
   /* ============ Mobile (≤ 720px): table becomes a card list ============ */
   @media (max-width: 720px) {
     header { padding: 10px 14px; gap: 8px; }
@@ -245,14 +287,38 @@
     .brand-logo { height: 32px; }
     .brand-block .tagline { font-size: 11px; padding-right: 2px; }
 
-    /* Filter bar: allow wrapping instead of horizontal scroll, smaller font. */
-    form.filters {
-      padding: 10px 12px; gap: 8px 10px;
-      flex-wrap: wrap; overflow-x: visible;
+    /* Toggle button visible; the bar collapses to a sticky drawer */
+    .mobile-filters-toggle {
+      display: block;
+      position: sticky; top: 0; z-index: 25;
+      width: 100%; padding: 10px 14px;
+      background: var(--card); color: var(--fg);
+      border: 0; border-bottom: 1px solid var(--line);
+      font: 600 13px 'Inter', system-ui, sans-serif;
+      text-align: left; cursor: pointer;
+      box-shadow: var(--shadow-sm);
     }
-    form.filters label { font-size: 10px; gap: 2px; }
-    form.filters input, form.filters select { font-size: 13px; padding: 6px 8px; }
-    form.filters button { padding: 7px 12px; font-size: 13px; }
+    .mobile-filters-toggle:hover { color: var(--accent); }
+    /* Hidden by default on mobile */
+    form.filters { display: none; }
+    /* Shown when body has `filters-open` class (toggle clicked) */
+    body.filters-open form.filters {
+      display: flex; flex-direction: column;
+      align-items: stretch; gap: 10px;
+      padding: 12px 14px;
+      position: fixed; left: 0; right: 0; top: 88px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
+      background: var(--card);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 8px 20px rgba(15,23,42,0.12);
+      z-index: 24;
+    }
+    body.filters-open form.filters label,
+    body.filters-open form.filters fieldset { width: 100%; }
+    body.filters-open form.filters input,
+    body.filters-open form.filters select { width: 100%; font-size: 14px; padding: 8px 10px; }
+    body.filters-open form.filters button { padding: 9px 14px; font-size: 14px; }
 
     /* Table -> stacked cards. Each <tr> is a card, each <td> is a row inside
        it with a "Label: value" layout (label comes from data-label attr). */
@@ -324,6 +390,7 @@
     <a href="/{{ _q }}">Trackday list</a>
     <a href="/map{{ _q }}">Map</a>
     <a href="/calendar{{ _q }}">Calendar</a>
+    {% if alerts_enabled %}<a href="/alerts" title="Get email alerts when matching trackdays appear">Alerts</a>{% endif %}
   </nav>
   {% set _gm = global_meta() %}
   <span class="meta">{{ _gm.count }} events · last refresh {{ _gm.last_run or "never" }}</span>
