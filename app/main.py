@@ -48,6 +48,35 @@ def _global_meta() -> dict:
 templates.env.globals["global_meta"] = _global_meta
 templates.env.globals["alerts_enabled"] = ALERTS_ENABLED
 
+
+def _breadcrumbs(path: str) -> list[dict]:
+    """Build breadcrumb trail items from a URL path. Used for both the visible
+    nav.crumbs and the JSON-LD BreadcrumbList that Google reads."""
+    items = [{"name": "Home", "url": "/"}]
+    parts = [p for p in path.strip("/").split("/") if p]
+    if not parts:
+        return items
+    # Friendly labels for top-level sections
+    section_labels = {
+        "map": "Map", "calendar": "Calendar",
+        "circuit": "Circuits", "circuits": "Circuits",
+        "organiser": "Organisers", "organisers": "Organisers",
+        "trackday": "Trackday",
+        "alerts": "Alerts",
+    }
+    head = parts[0]
+    items.append({"name": section_labels.get(head, head.title()),
+                  "url": f"/{head}" if head not in ("circuit", "organiser", "trackday") else f"/{head}s"})
+    if len(parts) > 1:
+        # last segment is the entity slug — humanise it
+        tail = parts[-1].replace("-", " ").replace("_", " ").title()
+        items.append({"name": tail, "url": "/" + "/".join(parts)})
+    return items
+
+
+templates.env.globals["breadcrumbs_for"] = _breadcrumbs
+templates.env.globals["canonical_host"] = CANONICAL_HOST
+
 app = FastAPI(title="TrackdayFinder")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 scheduler = AsyncIOScheduler()
@@ -451,6 +480,83 @@ async def event_detail(request: Request, source: str, key: str):
     })
 
 
+@app.get("/circuits", response_class=HTMLResponse)
+async def circuits_index(request: Request):
+    """Hub page listing every circuit (with or without current events)."""
+    from .circuit_coords import CIRCUIT_COORDS
+    today = date.today()
+    with db_session() as s:
+        events = s.exec(select(Event).where(Event.event_date >= today).order_by(Event.event_date)).all()
+    by_circuit: dict[str, list] = {}
+    for e in events:
+        by_circuit.setdefault(e.circuit, []).append(e)
+
+    # Crude UK/EU split — circuits in coords have known regions via the events.
+    def region_of(name: str) -> str:
+        evs = by_circuit.get(name, [])
+        if evs:
+            return "United Kingdom" if any(e.region == "UK" for e in evs) else "Europe"
+        # No events — guess from EXTERNAL_REGION or coords latitude (UK roughly < 60° N, > 49° N, longitude < 2° E)
+        from .circuit_coords import EXTERNAL_REGION
+        if name in EXTERNAL_REGION:
+            return "United Kingdom" if EXTERNAL_REGION[name] == "UK" else "Europe"
+        lat, lng = CIRCUIT_COORDS.get(name, (0, 0))
+        return "United Kingdom" if (49 <= lat <= 60 and -8 <= lng <= 2) else "Europe"
+
+    rows = []
+    for name in sorted(CIRCUIT_COORDS):
+        evs = by_circuit.get(name, [])
+        prices = [e.price_gbp for e in evs if e.price_gbp]
+        rows.append({
+            "name": name,
+            "slug": slugify(name),
+            "count": len(evs),
+            "next": evs[0].event_date.strftime("%d %b") if evs else "",
+            "cheapest": min(prices) if prices else None,
+            "region": region_of(name),
+        })
+    rows.sort(key=lambda r: (-r["count"], r["name"]))
+    rows_by_region = {"United Kingdom": [r for r in rows if r["region"] == "United Kingdom"],
+                      "Europe":         [r for r in rows if r["region"] == "Europe"]}
+    rows_by_region = {k: v for k, v in rows_by_region.items() if v}
+    return templates.TemplateResponse(request, "circuits_index.html", {
+        "rows": rows, "rows_by_region": rows_by_region,
+        "active": sum(1 for r in rows if r["count"]),
+        "now_year": today.year,
+    })
+
+
+@app.get("/organisers", response_class=HTMLResponse)
+async def organisers_index(request: Request):
+    """Hub page listing every organiser with their event count + circuit count."""
+    from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
+    today = date.today()
+    with db_session() as s:
+        events = s.exec(select(Event).where(Event.event_date >= today).order_by(Event.event_date)).all()
+    by_source: dict[str, list] = {}
+    for e in events:
+        by_source.setdefault(e.source, []).append(e)
+    rows = []
+    for slug, evs in by_source.items():
+        prices = [e.price_gbp for e in evs if e.price_gbp]
+        rows.append({
+            "name": ORGANISER_DISPLAY.get(slug, slug.replace("_", " ").title()),
+            "slug": slug,
+            "count": len(evs),
+            "circuits": len({e.circuit for e in evs}),
+            "cheapest": min(prices) if prices else None,
+            "region": "United Kingdom" if SOURCE_REGION.get(slug, "UK") == "UK" else "Europe",
+        })
+    rows.sort(key=lambda r: (-r["count"], r["name"]))
+    rows_by_region = {"United Kingdom": [r for r in rows if r["region"] == "United Kingdom"],
+                      "Europe":         [r for r in rows if r["region"] == "Europe"]}
+    rows_by_region = {k: v for k, v in rows_by_region.items() if v}
+    return templates.TemplateResponse(request, "organisers_index.html", {
+        "rows": rows, "rows_by_region": rows_by_region,
+        "now_year": today.year,
+    })
+
+
 @app.get("/circuit/{slug}", response_class=HTMLResponse)
 async def circuit_page(request: Request, slug: str):
     """SEO landing page for one circuit — all upcoming dates there."""
@@ -462,8 +568,6 @@ async def circuit_page(request: Request, slug: str):
     matching.sort(key=lambda e: e.event_date)
     organisers = sorted({e.organiser for e in matching})
 
-    # Use the canonical name from a matching event if we have one; otherwise
-    # try the coords table (so map's grey markers still resolve to a page).
     if matching:
         circuit_name = matching[0].circuit
     else:
@@ -471,12 +575,95 @@ async def circuit_page(request: Request, slug: str):
     if not circuit_name:
         raise HTTPException(status_code=404, detail="Circuit not found")
 
+    # Precompute SEO stats + narrative text for this page
+    seo = _circuit_seo(circuit_name, matching, organisers)
+
     return templates.TemplateResponse(request, "circuit.html", {
         "circuit": circuit_name,
         "events": matching,
         "organisers": organisers,
         "now_year": today.year,
+        "seo": seo,
     })
+
+
+def _circuit_seo(name: str, events: list, organisers: list[str]) -> dict:
+    """Build search-intent title + meta description + narrative paragraphs
+    using actual data so each circuit page has unique content."""
+    n = len(events)
+    today = date.today()
+    prices = [e.price_gbp for e in events if e.price_gbp]
+    cheapest = min(prices) if prices else None
+    priciest = max(prices) if prices else None
+    sold_out = sum(1 for e in events if e.sold_out)
+    upcoming = [e for e in events if e.event_date >= today]
+    next_date = upcoming[0].event_date if upcoming else None
+    last_date = events[-1].event_date if events else None
+    layouts = sorted({e.circuit_raw for e in events})
+    noises = sorted({e.noise_limit_db for e in events if e.noise_limit_db})
+    vehicle_kinds = sorted({e.vehicle_type for e in events if e.vehicle_type})
+    year = today.year
+
+    # Title for search results
+    if n:
+        bits = [f"{name} Trackdays {year}", f"{n} upcoming dates"]
+        if cheapest:
+            bits.append(f"from £{cheapest:.0f}")
+        title = " · ".join(bits) + " | TrackdayFinder.co.uk"
+    else:
+        title = f"{name} Trackdays — schedule | TrackdayFinder.co.uk"
+
+    # Meta description
+    desc_parts = []
+    if n:
+        desc_parts.append(f"{n} upcoming trackdays at {name} from {len(organisers)} organisers.")
+        if cheapest and priciest and cheapest != priciest:
+            desc_parts.append(f"Prices £{cheapest:.0f}–£{priciest:.0f}.")
+        elif cheapest:
+            desc_parts.append(f"From £{cheapest:.0f}.")
+        if next_date:
+            desc_parts.append(f"Next session {next_date:%a %d %b %Y}.")
+        desc_parts.append("Compare dates, prices and availability in one place.")
+    else:
+        desc_parts.append(f"Trackdays at {name}. Schedule, organisers, prices, noise limits.")
+    description = " ".join(desc_parts)[:300]
+
+    # Narrative content blocks (renders as paragraphs in the page body)
+    intro = (
+        f"{name} hosts {n} upcoming public trackday{'s' if n != 1 else ''} "
+        f"between {next_date:%B %Y} and {last_date:%B %Y}, run by "
+        f"{len(organisers)} organiser{'s' if len(organisers) != 1 else ''}: "
+        f"{', '.join(organisers)}." if n else
+        f"There are no scheduled public trackdays at {name} on TrackdayFinder right now."
+    )
+
+    facts = []
+    if cheapest and priciest:
+        if cheapest == priciest:
+            facts.append(f"Prices are typically £{cheapest:.0f}.")
+        else:
+            facts.append(f"Prices range from £{cheapest:.0f} to £{priciest:.0f}.")
+    if vehicle_kinds:
+        facts.append(f"Available for {', '.join(vehicle_kinds)}.")
+    if noises:
+        if len(noises) == 1:
+            facts.append(f"Standard noise limit is {noises[0]}dB.")
+        else:
+            facts.append(f"Noise limits vary by organiser ({min(noises)}–{max(noises)}dB).")
+    if sold_out:
+        facts.append(f"{sold_out} listed event{'s are' if sold_out != 1 else ' is'} already sold out.")
+    if len(layouts) > 1:
+        facts.append(f"Layout variants: {', '.join(layouts[:6])}.")
+
+    return {
+        "title": title,
+        "description": description,
+        "intro": intro,
+        "facts": facts,
+        "n": n, "cheapest": cheapest, "priciest": priciest,
+        "next_date": next_date, "last_date": last_date,
+        "sold_out": sold_out, "vehicle_kinds": vehicle_kinds, "noises": noises,
+    }
 
 
 @app.get("/organiser/{source}", response_class=HTMLResponse)
@@ -492,13 +679,72 @@ async def organiser_page(request: Request, source: str):
     if not events:
         raise HTTPException(status_code=404, detail="Organiser not found")
     circuits = sorted({e.circuit for e in events})
+    organiser_name = ORGANISER_DISPLAY.get(source, source.title())
+    seo = _organiser_seo(organiser_name, events, circuits)
     return templates.TemplateResponse(request, "organiser.html", {
         "source": source,
-        "organiser_name": ORGANISER_DISPLAY.get(source, source.title()),
+        "organiser_name": organiser_name,
         "events": events,
         "circuits": circuits,
         "now_year": today.year,
+        "seo": seo,
     })
+
+
+def _organiser_seo(name: str, events: list, circuits: list[str]) -> dict:
+    n = len(events)
+    today = date.today()
+    prices = [e.price_gbp for e in events if e.price_gbp]
+    cheapest = min(prices) if prices else None
+    priciest = max(prices) if prices else None
+    next_date = events[0].event_date if events else None
+    last_date = events[-1].event_date if events else None
+    vehicle_kinds = sorted({e.vehicle_type for e in events if e.vehicle_type})
+    year = today.year
+
+    if n:
+        bits = [f"{name} Trackday Calendar {year}", f"{n} dates", f"{len(circuits)} circuits"]
+        if cheapest:
+            bits.append(f"from £{cheapest:.0f}")
+        title = " · ".join(bits) + " | TrackdayFinder.co.uk"
+    else:
+        title = f"{name} Trackdays — calendar | TrackdayFinder.co.uk"
+
+    desc_parts = []
+    if n:
+        desc_parts.append(f"{n} upcoming trackdays from {name} across {len(circuits)} circuits.")
+        if cheapest and priciest and cheapest != priciest:
+            desc_parts.append(f"Prices £{cheapest:.0f}–£{priciest:.0f}.")
+        if next_date:
+            desc_parts.append(f"Next: {next_date:%a %d %b %Y}.")
+        desc_parts.append("Compare dates, prices and stock at every UK + European circuit they run.")
+    else:
+        desc_parts.append(f"{name} trackday schedule. Dates, circuits, prices.")
+    description = " ".join(desc_parts)[:300]
+
+    intro = (
+        f"{name} runs {n} upcoming trackday{'s' if n != 1 else ''} "
+        f"between {next_date:%B %Y} and {last_date:%B %Y}, across "
+        f"{len(circuits)} circuit{'s' if len(circuits) != 1 else ''}: "
+        f"{', '.join(circuits[:8])}{'…' if len(circuits) > 8 else ''}." if n else
+        f"No upcoming trackdays from {name} listed on TrackdayFinder right now."
+    )
+
+    facts = []
+    if cheapest and priciest:
+        if cheapest == priciest:
+            facts.append(f"All listed events are £{cheapest:.0f}.")
+        else:
+            facts.append(f"Entry fees range £{cheapest:.0f}–£{priciest:.0f}.")
+    if vehicle_kinds:
+        facts.append(f"Catering for {', '.join(vehicle_kinds)}.")
+    sold_out = sum(1 for e in events if e.sold_out)
+    if sold_out:
+        facts.append(f"{sold_out} event{'s are' if sold_out != 1 else ' is'} already sold out — book early.")
+
+    return {"title": title, "description": description, "intro": intro, "facts": facts,
+            "n": n, "cheapest": cheapest, "priciest": priciest,
+            "next_date": next_date, "last_date": last_date}
 
 
 @app.get("/calendar", response_class=HTMLResponse)

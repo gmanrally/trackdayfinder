@@ -306,14 +306,16 @@
     .mobile-filters-toggle:hover { color: var(--accent); }
     /* Hidden by default on mobile */
     form.filters { display: none; }
-    /* Shown when body has `filters-open` class (toggle clicked) */
+    /* Shown when body has `filters-open` class (toggle clicked).
+       Expands inline under the sticky toggle so it always pushes content
+       down and is never clipped by header/crumbs/page-specific layout. */
     body.filters-open form.filters {
       display: flex; flex-direction: column;
       align-items: stretch; gap: 10px;
       padding: 12px 14px;
-      position: fixed; left: 0; right: 0; top: 88px;
-      max-height: calc(100vh - 100px);
-      overflow-y: auto;
+      position: sticky; top: 40px; left: 0; right: 0;
+      max-height: calc(100vh - 60px);
+      overflow-y: auto; overflow-x: visible;
       background: var(--card);
       border-bottom: 1px solid var(--line);
       box-shadow: 0 8px 20px rgba(15,23,42,0.12);
@@ -415,5 +417,33 @@
 </footer>
 
 {% block jsonld %}{% endblock %}
+
+{# Auto BreadcrumbList — Google uses this to render the breadcrumb trail in search snippets. #}
+{% set _bc = breadcrumbs_for(request.url.path) %}
+{% if _bc|length > 1 %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {%- for item in _bc -%}
+    {"@type": "ListItem", "position": {{ loop.index }}, "name": "{{ item.name | e }}", "item": "{{ canonical_host }}{{ item.url }}"}{% if not loop.last %},{% endif %}
+    {%- endfor -%}
+  ]
+}
+</script>
+{% endif %}
+
+{# Site-wide Organization schema — tells Google who runs this site. #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "TrackdayFinder.co.uk",
+  "url": "{{ canonical_host }}/",
+  "logo": "{{ canonical_host }}/static/favicon-512.png",
+  "sameAs": ["https://gmracing.co.uk/"]
+}
+</script>
 </body>
 </html>

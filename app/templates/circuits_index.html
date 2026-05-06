@@ -1,0 +1,45 @@
+{% extends "_base.html" %}
+
+{% block title %}All UK & European Trackday Circuits — {{ rows|length }} venues | TrackdayFinder.co.uk{% endblock %}
+{% block meta_description %}Every UK and European trackday circuit we cover, with upcoming event counts. Pick a circuit to see its full schedule, organisers and prices.{% endblock %}
+
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; Circuits</nav>{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>All trackday circuits</h1>
+  <p class="lede">{{ rows|length }} circuits across the UK and Europe. {{ active }} have upcoming events listed; the rest are venues we know about but currently have no scheduled days for.</p>
+
+  {% for region, items in rows_by_region.items() %}
+  <h2>{{ region }} ({{ items|length }})</h2>
+  <div class="card-grid">
+    {% for r in items %}
+    <a class="card-link" href="/circuit/{{ r.slug }}">
+      <div class="card-title">{{ r.name }}</div>
+      <div class="card-meta">
+        {% if r.count %}{{ r.count }} upcoming · next {{ r.next }}{% if r.cheapest %} · from £{{ '%.0f' % r.cheapest }}{% endif %}
+        {% else %}No current events{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</article>
+{% endblock %}
+
+{% block jsonld %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "All trackday circuits",
+  "url": "{{ canonical_host }}/circuits",
+  "description": "Index of every UK and European circuit covered by TrackdayFinder.",
+  "hasPart": [
+    {%- for r in rows -%}
+    {"@type": "Place", "name": "{{ r.name | e }}", "url": "{{ canonical_host }}/circuit/{{ r.slug }}"}{% if not loop.last %},{% endif %}
+    {%- endfor -%}
+  ]
+}
+</script>
+{% endblock %}

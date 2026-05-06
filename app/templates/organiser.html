@@ -1,16 +1,21 @@
 {% extends "_base.html" %}
 
-{% block title %}{{ organiser_name }} Trackdays — {{ events|length }} upcoming dates | TrackdayFinder.co.uk{% endblock %}
-{% block meta_description %}All upcoming trackdays from {{ organiser_name }} across {{ circuits|length }} UK circuits. Compare dates, prices and availability in one place.{% endblock %}
+{% block title %}{{ seo.title if seo else organiser_name ~ ' Trackdays | TrackdayFinder.co.uk' }}{% endblock %}
+{% block meta_description %}{{ seo.description if seo else 'All upcoming trackdays from ' ~ organiser_name ~ '.' }}{% endblock %}
 
 {% block crumbs %}
-<nav class="crumbs"><a href="/">Home</a> &rsaquo; {{ organiser_name }}</nav>
+<nav class="crumbs"><a href="/">Home</a> &rsaquo; <a href="/organisers">Organisers</a> &rsaquo; {{ organiser_name }}</nav>
 {% endblock %}
 
 {% block content %}
 <article class="page">
-  <h1>{{ organiser_name }} trackdays</h1>
-  <p class="lede">{{ events|length }} upcoming {{ 'date' if events|length == 1 else 'dates' }} from {{ organiser_name }}, across {{ circuits|length }} {{ 'circuit' if circuits|length == 1 else 'circuits' }}.</p>
+  <h1>{{ organiser_name }} trackday calendar {{ seo.next_date.year if seo and seo.next_date else now_year }}</h1>
+  <p class="lede">{{ seo.intro if seo else (events|length ~ ' upcoming dates from ' ~ organiser_name) }}</p>
+  {% if seo and seo.facts %}
+  <ul style="color:var(--muted);font-size:14px;margin:0 0 18px;padding-left:18px">
+    {% for f in seo.facts %}<li>{{ f }}</li>{% endfor %}
+  </ul>
+  {% endif %}
 
   {% if events %}
   <div class="table-scroll">

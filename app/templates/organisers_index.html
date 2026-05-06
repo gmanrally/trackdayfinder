@@ -1,0 +1,45 @@
+{% extends "_base.html" %}
+
+{% block title %}UK & European Trackday Organisers — {{ rows|length }} listed | TrackdayFinder.co.uk{% endblock %}
+{% block meta_description %}Every trackday organiser we aggregate (MSV, Javelin, OpenTrack, Silverstone, Goodwood, RSR Nürburgring and more). Click for their full {{ now_year }} calendar.{% endblock %}
+
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; Organisers</nav>{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>All trackday organisers</h1>
+  <p class="lede">{{ rows|length }} organisers across the UK and Europe — pick one to see their full {{ now_year }} schedule, prices, and circuit list.</p>
+
+  {% for region, items in rows_by_region.items() %}
+  <h2>{{ region }} ({{ items|length }})</h2>
+  <div class="card-grid">
+    {% for r in items %}
+    <a class="card-link" href="/organiser/{{ r.slug }}">
+      <div class="card-title">{{ r.name }}</div>
+      <div class="card-meta">
+        {{ r.count }} upcoming · {{ r.circuits }} circuit{{ '' if r.circuits == 1 else 's' }}
+        {% if r.cheapest %} · from £{{ '%.0f' % r.cheapest }}{% endif %}
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</article>
+{% endblock %}
+
+{% block jsonld %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "All trackday organisers",
+  "url": "{{ canonical_host }}/organisers",
+  "description": "Directory of trackday organisers covered by TrackdayFinder.",
+  "hasPart": [
+    {%- for r in rows -%}
+    {"@type": "Organization", "name": "{{ r.name | e }}", "url": "{{ canonical_host }}/organiser/{{ r.slug }}"}{% if not loop.last %},{% endif %}
+    {%- endfor -%}
+  ]
+}
+</script>
+{% endblock %}
