@@ -966,6 +966,8 @@ async def map_page(request: Request,
             "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "weekdays": list(weekdays),
+            "month": month,
         },
     })
 
