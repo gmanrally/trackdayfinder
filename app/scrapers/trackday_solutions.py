@@ -68,18 +68,18 @@ async def fetch() -> list[RawEvent]:
         back = html[max(0, m.start() - 500):m.start()]
         fwd = html[m.end(): m.end() + 1500]
 
-        # Last price in the preceding window belongs to *this* product
-        # (later products' prices haven't appeared yet).
+        # Wix product field order is: price, ..., sku, isInStock, urlPart,
+        # formattedPrice, ..., name. So price + isInStock are in `back`
+        # (take the last occurrence — closest to this product), name in `fwd`.
         prices = re.findall(r'"price":(\d+(?:\.\d+)?)', back)
-        # First name+stock after urlPart belongs to this product.
+        stocks = re.findall(r'"isInStock":(true|false)', back)
         name_m = re.search(r'"name":"([^"]+)"', fwd)
-        stock_m = re.search(r'"isInStock":(true|false)', fwd)
 
         if not name_m:
             continue
         ev = _build_event(sku, name_m.group(1),
                           float(prices[-1]) if prices else None,
-                          (stock_m.group(1) == "true") if stock_m else True)
+                          (stocks[-1] == "true") if stocks else True)
         if ev:
             out.append(ev)
     return out
