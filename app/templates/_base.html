@@ -160,13 +160,16 @@
   form.filters button.btn-clear:hover { background: #f8fafc; border-color: var(--accent); color: var(--accent); }
 
   /* ===== "When" combined date/month/weekday popover ===== */
-  .when-btn {
+  form.filters .when-btn, form.filters button.when-btn {
     background:#fff; color:var(--fg); border:1px solid var(--line-2);
     padding:7px 12px; font-size:13px; font-weight:500; border-radius:6px;
     cursor:pointer; min-width:160px; text-align:left;
     display:inline-flex; align-items:center;
+    box-shadow:none;
   }
-  .when-btn:hover { border-color:var(--accent); }
+  form.filters .when-btn:hover, form.filters button.when-btn:hover {
+    background:#fff; border-color:var(--accent); color:var(--fg);
+  }
   .when-pop {
     position:fixed; z-index:9999;
     background:#fff; border:1px solid var(--line-2); border-radius:8px;
