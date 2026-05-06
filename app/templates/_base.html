@@ -238,6 +238,31 @@
   tbody tr:nth-child(even) td { background: #f1f5f9; }
   tbody tr:hover td { background: var(--hi-bg); }
   tbody tr:last-child td { border-bottom: none; }
+
+  /* Per-source colour stripe on the left edge of each row.
+     Renders as a left border on desktop tables and as a left edge stripe
+     on mobile cards (where each <tr> becomes display:block). */
+  tbody tr td:first-child { box-shadow: inset 4px 0 0 var(--src, #cbd5e1); }
+  tbody tr[data-source="msv"]            { --src: #c0392b; }
+  tbody tr[data-source="javelin"]        { --src: #2563eb; }
+  tbody tr[data-source="opentrack"]      { --src: #059669; }
+  tbody tr[data-source="circuit_days"]   { --src: #d97706; }
+  tbody tr[data-source="silverstone"]    { --src: #1e293b; }
+  tbody tr[data-source="rma"]            { --src: #7c3aed; }
+  tbody tr[data-source="mot"]            { --src: #db2777; }
+  tbody tr[data-source="nolimits"]       { --src: #0891b2; }
+  tbody tr[data-source="goldtrack"]      { --src: #b45309; }
+  tbody tr[data-source="msevents"]       { --src: #65a30d; }
+  tbody tr[data-source="goodwood"]       { --src: #134e4a; }
+  tbody tr[data-source="slipandgrip"]    { --src: #ea580c; }
+  tbody tr[data-source="trackobsession"] { --src: #4338ca; }
+  tbody tr[data-source="rsr_nurburg"]    { --src: #be123c; }
+  tbody tr[data-source="gedlich"]        { --src: #15803d; }
+  tbody tr[data-source="trackdays_events"] { --src: #6d28d9; }
+  tbody tr[data-source="nurburgring_tf"] { --src: #991b1b; }
+  tbody tr[data-source="pembrey"]        { --src: #0369a1; }
+  tbody tr[data-source="llandow"]        { --src: #047857; }
+  tbody tr[data-source="kirkistown"]     { --src: #92400e; }
   tr.soldout td { opacity: 0.45; text-decoration: line-through; }
   td.right { text-align: right; }
   /* Table cell links: subtle dark with red hover, not red-by-default. */
@@ -382,9 +407,31 @@
 </head>
 <body>
 
+<script>
+/* Saved default view + filters (localStorage). Runs before paint so redirect
+   from / to the user's saved view is flicker-free. Escape hatch: ?nodefault=1
+   on the URL skips the redirect (used by the brand "Home" link). */
+(function () {
+  const KEY = 'tdf_default';
+  const params = new URLSearchParams(location.search);
+  if (location.pathname === '/' && !params.has('nodefault')) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (saved && saved.view) {
+        const target = saved.view + (saved.query ? '?' + saved.query : '');
+        if (target !== location.pathname + location.search) {
+          location.replace(target);
+          return;
+        }
+      }
+    } catch (e) {}
+  }
+})();
+</script>
+
 <header>
   <div class="brand-block">
-    <a href="/" class="brand-link" aria-label="TrackdayFinder home">
+    <a href="/?nodefault=1" class="brand-link" aria-label="TrackdayFinder home">
       <img src="/static/logo-light.svg" alt="TrackdayFinder" class="brand-logo">
     </a>
     <span class="tagline">kindly provided by
@@ -445,5 +492,45 @@
   "sameAs": ["https://gmracing.co.uk/"]
 }
 </script>
+<script>
+/* Save / clear default view buttons in the filter bar. Captures the live
+   form state rather than location.search so unsaved tweaks are honoured. */
+(function () {
+  const KEY = 'tdf_default';
+  document.addEventListener('DOMContentLoaded', function () {
+    const saveBtn = document.getElementById('save-default');
+    const clearBtn = document.getElementById('clear-default');
+    if (!saveBtn) return;
+    function refresh() {
+      const has = !!localStorage.getItem(KEY);
+      saveBtn.textContent = has ? '★ Update default' : '★ Save as default';
+      if (clearBtn) clearBtn.hidden = !has;
+    }
+    refresh();
+    saveBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      const form = document.querySelector('form.filters');
+      const params = form
+        ? new URLSearchParams(new FormData(form))
+        : new URLSearchParams(location.search);
+      for (const [k, v] of [...params]) if (!v) params.delete(k);
+      localStorage.setItem(KEY, JSON.stringify({
+        view: location.pathname,
+        query: params.toString(),
+        savedAt: Date.now(),
+      }));
+      saveBtn.textContent = '✓ Saved';
+      if (clearBtn) clearBtn.hidden = false;
+      setTimeout(refresh, 1200);
+    });
+    if (clearBtn) clearBtn.addEventListener('click', function (e) {
+      e.preventDefault();
+      localStorage.removeItem(KEY);
+      refresh();
+    });
+  });
+})();
+</script>
+
 </body>
 </html>
