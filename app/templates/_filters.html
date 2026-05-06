@@ -1,7 +1,7 @@
 {# Reusable filters bar. Set form_action to override (defaults to current page). #}
 {# Mobile-only "Filters" toggle button — opens a sticky drawer of all controls. #}
 <button type="button" id="mobile-filters-toggle" class="mobile-filters-toggle">Filters ▾</button>
-<form class="filters" method="get" action="{{ form_action or request.url.path }}">
+<form id="filters-form" class="filters" method="get" action="{{ form_action or request.url.path }}">
   {# Multi-select checkbox popover (Circuit). Same pattern reused for Session + Source. #}
   <label style="position:relative">Circuit
     <button type="button" class="when-btn check-trigger" data-target="circuit-pop">
@@ -11,7 +11,7 @@
     <div id="circuit-pop" class="when-pop check-pop" hidden data-name="circuit">
       <div class="when-section" style="max-height:280px;overflow-y:auto">
         {% for c in circuits %}
-        <label class="check-item"><input type="checkbox" name="circuit" value="{{ c }}" {% if c in (filters.circuits or []) %}checked{% endif %}> {{ c }}</label>
+        <label class="check-item"><input type="checkbox" form="filters-form" name="circuit" value="{{ c }}" {% if c in (filters.circuits or []) %}checked{% endif %}> {{ c }}</label>
         {% endfor %}
       </div>
       <div class="check-actions">
@@ -34,7 +34,7 @@
     <div id="session-pop" class="when-pop check-pop" hidden data-name="session">
       <div class="when-section">
         {% for s in sessions %}
-        <label class="check-item"><input type="checkbox" name="session" value="{{ s }}" {% if s in (filters.sessions or []) %}checked{% endif %}> {{ s }}</label>
+        <label class="check-item"><input type="checkbox" form="filters-form" name="session" value="{{ s }}" {% if s in (filters.sessions or []) %}checked{% endif %}> {{ s }}</label>
         {% endfor %}
       </div>
       <div class="check-actions">
@@ -49,12 +49,12 @@
     </button>
     <div id="source-pop" class="when-pop check-pop" hidden data-name="source">
       <div class="when-section" style="max-height:300px;overflow-y:auto">
-        <label class="check-item"><input type="checkbox" name="source" value="region-uk" {% if 'region-uk' in (filters.sources or []) %}checked{% endif %}> All UK organisers</label>
-        <label class="check-item"><input type="checkbox" name="source" value="region-eu" {% if 'region-eu' in (filters.sources or []) %}checked{% endif %}> All European organisers</label>
+        <label class="check-item"><input type="checkbox" form="filters-form" name="source" value="region-uk" {% if 'region-uk' in (filters.sources or []) %}checked{% endif %}> All UK organisers</label>
+        <label class="check-item"><input type="checkbox" form="filters-form" name="source" value="region-eu" {% if 'region-eu' in (filters.sources or []) %}checked{% endif %}> All European organisers</label>
         {% for group_label, items in sources_grouped %}
         <div class="check-group">{{ group_label }}</div>
         {% for slug, name in items %}
-        <label class="check-item"><input type="checkbox" name="source" value="{{ slug }}" {% if slug in (filters.sources or []) %}checked{% endif %}> {{ name }}</label>
+        <label class="check-item"><input type="checkbox" form="filters-form" name="source" value="{{ slug }}" {% if slug in (filters.sources or []) %}checked{% endif %}> {{ name }}</label>
         {% endfor %}
         {% endfor %}
       </div>
@@ -302,17 +302,46 @@
       document.addEventListener('click', function (ev) {
         if (!pop.hidden && !pop.contains(ev.target) && !trigger.contains(ev.target)) close();
       });
+      function submitKeepingOpen() {
+        // Inject a flag the page-load JS reads to re-open this popover after
+        // the reload, so the user can tick more boxes without re-clicking.
+        var existing = form.querySelector('input[name="_open"]');
+        if (existing) existing.remove();
+        var hint = document.createElement('input');
+        hint.type = 'hidden'; hint.name = '_open'; hint.value = popId;
+        form.appendChild(hint);
+        form.submit();
+      }
       pop.querySelector('.check-clear').addEventListener('click', function () {
         pop.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
         refreshSummary();
-        form.submit();
+        submitKeepingOpen();
       });
       // Submit on every checkbox tick.
-      pop.addEventListener('change', function () { refreshSummary(); form.submit(); });
+      pop.addEventListener('change', function () { refreshSummary(); submitKeepingOpen(); });
       window.__filterPops = window.__filterPops || [];
-      window.__filterPops.push({ pop: pop, close: close });
+      window.__filterPops.push({ pop: pop, close: close, popId: popId, trigger: trigger, position: position });
       refreshSummary();
     });
+
+    // Re-open the popover that submitted the last reload, so multi-tick feels
+    // continuous. The ?_open=<popId> query param is set by submitKeepingOpen
+    // and is ignored by the backend.
+    (function reopenAfterSubmit() {
+      var openParam = new URLSearchParams(location.search).get('_open');
+      if (!openParam) return;
+      var entry = (window.__filterPops || []).find(function (p) { return p.popId === openParam; });
+      if (!entry) return;
+      // Strip _open from the visible URL so refreshes don't keep re-opening.
+      var p = new URLSearchParams(location.search); p.delete('_open');
+      var clean = location.pathname + (p.toString() ? '?' + p.toString() : '');
+      history.replaceState(null, '', clean);
+      // Open the popover at next tick so layout is settled.
+      setTimeout(function () {
+        entry.pop.hidden = false;
+        if (entry.position) entry.position();
+      }, 0);
+    })();
 
     // Mobile drawer toggle
     var toggle = document.getElementById('mobile-filters-toggle');
