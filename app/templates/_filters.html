@@ -239,12 +239,12 @@
         fp.clear();
         syncMonthChips(); syncWeekdayChips();
         syncMonthInputs(); syncWeekdayInputs();
-        form.submit();
+        (window.__applyFilters || form.submit.bind(form))();
       });
-      // Apply button — write hidden inputs and submit
+      // Apply button — write hidden inputs and navigate
       document.getElementById('when-apply').addEventListener('click', function () {
         syncMonthInputs(); syncWeekdayInputs();
-        form.submit();
+        (window.__applyFilters || form.submit.bind(form))();
       });
       refreshSummary();
     })();
@@ -270,6 +270,32 @@
     });
     form.querySelectorAll('input[type=number]').forEach(function (el) { el.addEventListener('input', submitDebounced); });
     document.getElementById('clear-filters').addEventListener('click', function () { window.location = form.getAttribute('action') || '/'; });
+
+    // Build a URL from the current state of all controls (form + reparented
+    // popover checkboxes) and navigate. We can't trust form.submit() here
+    // because popovers are reparented to <body> to escape overflow clipping,
+    // and HTML5 form="..." association behaves inconsistently across browsers
+    // when a checkbox is detached from its form's DOM subtree. Exposed on
+    // window so both this IIFE and the When-popover IIFE can call it.
+    window.__applyFilters = function () {
+      var params = new URLSearchParams();
+      // 1) Inputs that are real descendants of the form (Vehicle, Max £,
+      //    Hide-sold-out, hidden from_, to, weekdays, month).
+      var fd = new FormData(form);
+      for (var pair of fd.entries()) {
+        var k = pair[0], v = pair[1];
+        if (v === '' || v == null) continue;
+        params.append(k, v);
+      }
+      // 2) Reparented popover checkboxes — read directly from the DOM.
+      document.querySelectorAll('.check-pop input[type=checkbox]:checked').forEach(function (cb) {
+        params.append(cb.name, cb.value);
+      });
+      var action = form.getAttribute('action') || location.pathname;
+      var qs = params.toString();
+      location.href = action + (qs ? '?' + qs : '');
+    };
+    var applyFiltersAndNavigate = window.__applyFilters;
 
     // Generic checkbox-popover wiring (Circuit / Session / Source).
     document.querySelectorAll('.check-trigger').forEach(function (trigger) {
@@ -314,9 +340,9 @@
       pop.querySelector('.check-clear').addEventListener('click', function () {
         pop.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
         refreshSummary();
-        form.submit();
+        applyFiltersAndNavigate();
       });
-      pop.querySelector('.check-apply').addEventListener('click', function () { form.submit(); });
+      pop.querySelector('.check-apply').addEventListener('click', applyFiltersAndNavigate);
       // Update summary live as boxes are ticked, but don't submit until Apply.
       pop.addEventListener('change', refreshSummary);
       refreshSummary();
