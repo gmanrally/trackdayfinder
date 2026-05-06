@@ -2,11 +2,23 @@
 {# Mobile-only "Filters" toggle button — opens a sticky drawer of all controls. #}
 <button type="button" id="mobile-filters-toggle" class="mobile-filters-toggle">Filters ▾</button>
 <form class="filters" method="get" action="{{ form_action or request.url.path }}">
-  <label>Circuit
-    <select name="circuit">
-      <option value="">Any</option>
-      {% for c in circuits %}<option value="{{ c }}" {% if c == filters.circuit %}selected{% endif %}>{{ c }}</option>{% endfor %}
-    </select>
+  {# Multi-select checkbox popover (Circuit). Same pattern reused for Session + Source. #}
+  <label style="position:relative">Circuit
+    <button type="button" class="when-btn check-trigger" data-target="circuit-pop">
+      <span class="check-summary" data-default="Any">Any</span>
+      <span style="margin-left:6px;color:var(--muted-2)">▾</span>
+    </button>
+    <div id="circuit-pop" class="when-pop check-pop" hidden data-name="circuit">
+      <div class="when-section" style="max-height:280px;overflow-y:auto">
+        {% for c in circuits %}
+        <label class="check-item"><input type="checkbox" name="circuit" value="{{ c }}" {% if c in (filters.circuits or []) %}checked{% endif %}> {{ c }}</label>
+        {% endfor %}
+      </div>
+      <div class="check-actions">
+        <button type="button" class="btn-clear check-clear" style="font-size:12px;padding:5px 10px">Clear</button>
+        <button type="button" class="book-btn check-apply" style="font-size:12px;padding:5px 14px">Apply</button>
+      </div>
+    </div>
   </label>
   <label>Vehicle
     <select name="vehicle">
@@ -15,23 +27,44 @@
       <option value="bike" {% if filters.vehicle == 'bike' %}selected{% endif %}>Bike</option>
     </select>
   </label>
-  <label>Session
-    <select name="session">
-      <option value="">Any</option>
-      {% for s in sessions %}<option value="{{ s }}" {% if s == filters.session %}selected{% endif %}>{{ s }}</option>{% endfor %}
-    </select>
+  <label style="position:relative">Session
+    <button type="button" class="when-btn check-trigger" data-target="session-pop">
+      <span class="check-summary" data-default="Any">Any</span>
+      <span style="margin-left:6px;color:var(--muted-2)">▾</span>
+    </button>
+    <div id="session-pop" class="when-pop check-pop" hidden data-name="session">
+      <div class="when-section">
+        {% for s in sessions %}
+        <label class="check-item"><input type="checkbox" name="session" value="{{ s }}" {% if s in (filters.sessions or []) %}checked{% endif %}> {{ s }}</label>
+        {% endfor %}
+      </div>
+      <div class="check-actions">
+        <button type="button" class="btn-clear check-clear" style="font-size:12px;padding:5px 10px">Clear</button>
+        <button type="button" class="book-btn check-apply" style="font-size:12px;padding:5px 14px">Apply</button>
+      </div>
+    </div>
   </label>
-  <label>Source
-    <select name="source">
-      <option value="">All sources</option>
-      <option value="region-uk" {% if filters.source == 'region-uk' %}selected{% endif %}>All UK organisers</option>
-      <option value="region-eu" {% if filters.source == 'region-eu' %}selected{% endif %}>All European organisers</option>
-      {% for group_label, items in sources_grouped %}
-      <optgroup label="{{ group_label }}">
-        {% for slug, name in items %}<option value="{{ slug }}" {% if slug == filters.source %}selected{% endif %}>{{ name }}</option>{% endfor %}
-      </optgroup>
-      {% endfor %}
-    </select>
+  <label style="position:relative">Source
+    <button type="button" class="when-btn check-trigger" data-target="source-pop">
+      <span class="check-summary" data-default="All sources">All sources</span>
+      <span style="margin-left:6px;color:var(--muted-2)">▾</span>
+    </button>
+    <div id="source-pop" class="when-pop check-pop" hidden data-name="source">
+      <div class="when-section" style="max-height:300px;overflow-y:auto">
+        <label class="check-item"><input type="checkbox" name="source" value="region-uk" {% if 'region-uk' in (filters.sources or []) %}checked{% endif %}> All UK organisers</label>
+        <label class="check-item"><input type="checkbox" name="source" value="region-eu" {% if 'region-eu' in (filters.sources or []) %}checked{% endif %}> All European organisers</label>
+        {% for group_label, items in sources_grouped %}
+        <div class="check-group">{{ group_label }}</div>
+        {% for slug, name in items %}
+        <label class="check-item"><input type="checkbox" name="source" value="{{ slug }}" {% if slug in (filters.sources or []) %}checked{% endif %}> {{ name }}</label>
+        {% endfor %}
+        {% endfor %}
+      </div>
+      <div class="check-actions">
+        <button type="button" class="btn-clear check-clear" style="font-size:12px;padding:5px 10px">Clear</button>
+        <button type="button" class="book-btn check-apply" style="font-size:12px;padding:5px 14px">Apply</button>
+      </div>
+    </div>
   </label>
   {# ------ "When" combined popover: dates + month + weekdays in one button ------ #}
   <label style="position:relative">When
@@ -69,23 +102,23 @@
   </label>
   <input type="hidden" id="from-input" name="from_" value="{{ filters.from_ or '' }}">
   <input type="hidden" id="to-input"   name="to"    value="{{ filters.to or '' }}">
-  <input type="hidden" id="month-input" name="month" value="{{ filters.month or '' }}">
+  {% for m in (filters.months or []) %}<input type="hidden" name="month" value="{{ m }}">{% endfor %}
   {% for d in (filters.weekdays or []) %}<input type="hidden" name="weekdays" value="{{ d }}">{% endfor %}
   <script>
     (function () {
       var fromI = document.getElementById('from-input');
       var toI   = document.getElementById('to-input');
-      var monthI = document.getElementById('month-input');
       var rangeI = document.getElementById('date-range');
       var trigger = document.getElementById('when-trigger');
       var pop = document.getElementById('when-pop');
       var summary = document.getElementById('when-summary');
+      var form = document.querySelector('form.filters');
       var todayIso = '{{ today_iso }}';
       var monthLabels = {
-        '{{ "" }}': 'Any',
         {% for val, label in (months or []) %}'{{ val }}': '{{ label }}',{% endfor %}
       };
-      // Selected weekdays starts from server-rendered hidden inputs.
+      // Selected months/weekdays start from server-rendered hidden inputs.
+      var selectedMonths = new Set([{% for m in (filters.months or []) %}'{{ m }}',{% endfor %}]);
       var selectedDays = new Set([{% for d in (filters.weekdays or []) %}'{{ d }}',{% endfor %}]);
 
       function formatISO(d) {
@@ -93,8 +126,10 @@
       }
       function refreshSummary() {
         var parts = [];
-        if (monthI.value) parts.push(monthLabels[monthI.value] || monthI.value);
-        else if (fromI.value && toI.value) {
+        if (selectedMonths.size) {
+          var ms = [...selectedMonths].sort().map(m => monthLabels[m] || m);
+          parts.push(ms.length <= 2 ? ms.join(', ') : ms.length + ' months');
+        } else if (fromI.value && toI.value) {
           parts.push(rangeI.value || (fromI.value + ' → ' + toI.value));
         } else if (fromI.value) {
           parts.push('from ' + (rangeI.value || fromI.value));
@@ -107,18 +142,27 @@
         summary.textContent = parts.length ? parts.join(' · ') : 'Any time';
       }
       function syncWeekdayInputs() {
-        // Remove existing weekdays hidden inputs and re-add per current set.
         document.querySelectorAll('input[type=hidden][name="weekdays"]').forEach(n => n.remove());
-        var form = document.querySelector('form.filters');
         selectedDays.forEach(d => {
           var i = document.createElement('input');
           i.type='hidden'; i.name='weekdays'; i.value=d;
           form.appendChild(i);
         });
       }
+      function syncMonthInputs() {
+        document.querySelectorAll('input[type=hidden][name="month"]').forEach(n => n.remove());
+        selectedMonths.forEach(m => {
+          var i = document.createElement('input');
+          i.type='hidden'; i.name='month'; i.value=m;
+          form.appendChild(i);
+        });
+      }
       function syncMonthChips() {
         document.querySelectorAll('#when-months .when-chip').forEach(b => {
-          b.classList.toggle('on', (b.dataset.month || '') === monthI.value);
+          var v = b.dataset.month || '';
+          // The "Any" chip is on when no months are selected.
+          if (v === '') b.classList.toggle('on', selectedMonths.size === 0);
+          else b.classList.toggle('on', selectedMonths.has(v));
         });
       }
       function syncWeekdayChips() {
@@ -136,17 +180,23 @@
         onChange: function (sel) {
           fromI.value = sel[0] ? formatISO(sel[0]) : '';
           toI.value   = sel[1] ? formatISO(sel[1]) : '';
-          // Picking a date range clears any selected month
-          if (sel.length) { monthI.value = ''; syncMonthChips(); }
+          // Picking a date range clears any selected months
+          if (sel.length) { selectedMonths.clear(); syncMonthChips(); }
         }
       });
-      // Month chip clicks
+      // Month chip clicks (multi-select; "Any" chip clears all)
       document.getElementById('when-months').addEventListener('click', function (ev) {
         var b = ev.target.closest('.when-chip'); if (!b) return;
-        monthI.value = b.dataset.month || '';
-        // Picking a month clears any date range
-        if (monthI.value) { fromI.value = ''; toI.value = ''; fp.clear(); }
-        syncMonthChips();
+        var v = b.dataset.month || '';
+        if (v === '') {
+          selectedMonths.clear();
+        } else {
+          if (selectedMonths.has(v)) selectedMonths.delete(v);
+          else selectedMonths.add(v);
+          // Picking a month clears any date range
+          fromI.value = ''; toI.value = ''; fp.clear();
+        }
+        refreshSummary();
       });
       // Weekday letter clicks (toggle)
       document.getElementById('when-weekdays').addEventListener('click', function (ev) {
@@ -184,16 +234,17 @@
       });
       // Clear button — wipe all "when" state and submit
       document.getElementById('when-clear').addEventListener('click', function () {
-        fromI.value = ''; toI.value = ''; monthI.value = ''; selectedDays.clear();
+        fromI.value = ''; toI.value = '';
+        selectedMonths.clear(); selectedDays.clear();
         fp.clear();
         syncMonthChips(); syncWeekdayChips();
-        syncWeekdayInputs();
-        document.querySelector('form.filters').submit();
+        syncMonthInputs(); syncWeekdayInputs();
+        form.submit();
       });
       // Apply button — write hidden inputs and submit
       document.getElementById('when-apply').addEventListener('click', function () {
-        syncWeekdayInputs();
-        document.querySelector('form.filters').submit();
+        syncMonthInputs(); syncWeekdayInputs();
+        form.submit();
       });
       refreshSummary();
     })();
@@ -210,9 +261,66 @@
     var debounceTimer;
     function submitNow() { form.submit(); }
     function submitDebounced() { clearTimeout(debounceTimer); debounceTimer = setTimeout(submitNow, 350); }
-    form.querySelectorAll('select, input[type=checkbox]').forEach(function (el) { el.addEventListener('change', submitNow); });
+    // Auto-submit on Vehicle (single select) and the Hide-sold-out checkbox.
+    // Popover checkboxes are inside .check-pop and submit only on Apply.
+    form.querySelectorAll('select').forEach(function (el) { el.addEventListener('change', submitNow); });
+    form.querySelectorAll('input[type=checkbox]').forEach(function (el) {
+      if (el.closest('.check-pop')) return;
+      el.addEventListener('change', submitNow);
+    });
     form.querySelectorAll('input[type=number]').forEach(function (el) { el.addEventListener('input', submitDebounced); });
     document.getElementById('clear-filters').addEventListener('click', function () { window.location = form.getAttribute('action') || '/'; });
+
+    // Generic checkbox-popover wiring (Circuit / Session / Source).
+    document.querySelectorAll('.check-trigger').forEach(function (trigger) {
+      var popId = trigger.dataset.target;
+      var pop = document.getElementById(popId);
+      if (!pop) return;
+      var summary = trigger.querySelector('.check-summary');
+      var defaultText = summary.dataset.default || 'Any';
+      // Re-attach to body so it escapes the filter bar's overflow:auto.
+      if (pop.parentNode !== document.body) document.body.appendChild(pop);
+
+      function checkedItems() {
+        return Array.from(pop.querySelectorAll('input[type=checkbox]:checked'));
+      }
+      function refreshSummary() {
+        var items = checkedItems();
+        if (!items.length) { summary.textContent = defaultText; return; }
+        if (items.length === 1) {
+          var lbl = items[0].closest('label');
+          summary.textContent = lbl ? lbl.textContent.trim() : items[0].value;
+          return;
+        }
+        summary.textContent = items.length + ' selected';
+      }
+      function position() {
+        var r = trigger.getBoundingClientRect();
+        var w = 280;
+        var left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left));
+        pop.style.left = left + 'px';
+        pop.style.top  = (r.bottom + 6) + 'px';
+        pop.style.width = w + 'px';
+      }
+      trigger.addEventListener('click', function (ev) {
+        ev.stopPropagation();
+        if (pop.hidden) { pop.hidden = false; position(); } else { pop.hidden = true; }
+      });
+      window.addEventListener('resize', function () { if (!pop.hidden) position(); });
+      window.addEventListener('scroll', function () { if (!pop.hidden) position(); }, true);
+      document.addEventListener('click', function (ev) {
+        if (!pop.hidden && !pop.contains(ev.target) && !trigger.contains(ev.target)) pop.hidden = true;
+      });
+      pop.querySelector('.check-clear').addEventListener('click', function () {
+        pop.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
+        refreshSummary();
+        form.submit();
+      });
+      pop.querySelector('.check-apply').addEventListener('click', function () { form.submit(); });
+      // Update summary live as boxes are ticked, but don't submit until Apply.
+      pop.addEventListener('change', refreshSummary);
+      refreshSummary();
+    });
 
     // Mobile drawer toggle
     var toggle = document.getElementById('mobile-filters-toggle');

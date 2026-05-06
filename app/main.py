@@ -201,6 +201,12 @@ def _qs_no_sort(request: Request) -> str:
 INDEX_PAGE_DAYS = 30
 
 
+def _multi(request: Request, name: str) -> list[str]:
+    """Read repeated query params as a list, dropping empties.
+    Supports both ?k=A&k=B and the legacy single-value ?k=A form."""
+    return [v for v in request.query_params.getlist(name) if v]
+
+
 def _filtered_events_query(circuit, vehicle, source, session,
                            from_, to, max_price, hide_sold_out, sort,
                            weekdays=None, month=None):
@@ -213,18 +219,34 @@ def _filtered_events_query(circuit, vehicle, source, session,
     from sqlmodel import func as _func
     today = date.today()
     q = select(Event).where(Event.event_date >= today)
-    if circuit:
-        q = q.where(Event.circuit == circuit)
+    # circuit / source / session may arrive as a single string (legacy) or
+    # a list of strings (multi-select). Normalise to a list and use IN.
+    def _aslist(v):
+        if v is None or v == "": return []
+        return v if isinstance(v, (list, tuple)) else [v]
+    circuits = _aslist(circuit)
+    sources  = _aslist(source)
+    sessions_ = _aslist(session)
+    if circuits:
+        q = q.where(Event.circuit.in_(circuits))
     if vehicle:
         q = q.where(Event.vehicle_type == vehicle)
-    if source == "region-uk":
-        q = q.where(Event.region == "UK")
-    elif source == "region-eu":
-        q = q.where(Event.region == "EU")
-    elif source:
-        q = q.where(Event.source == source)
-    if session:
-        q = q.where(Event.session == session)
+    # Region pseudo-sources can sit alongside specific organiser slugs.
+    region_filters = []
+    real_sources = []
+    for s in sources:
+        if s == "region-uk": region_filters.append("UK")
+        elif s == "region-eu": region_filters.append("EU")
+        elif s: real_sources.append(s)
+    if region_filters and not real_sources:
+        q = q.where(Event.region.in_(region_filters))
+    elif real_sources and not region_filters:
+        q = q.where(Event.source.in_(real_sources))
+    elif real_sources and region_filters:
+        from sqlmodel import or_
+        q = q.where(or_(Event.region.in_(region_filters), Event.source.in_(real_sources)))
+    if sessions_:
+        q = q.where(Event.session.in_(sessions_))
     if from_:
         try: q = q.where(Event.event_date >= date.fromisoformat(from_))
         except ValueError: pass
@@ -236,17 +258,23 @@ def _filtered_events_query(circuit, vehicle, source, session,
         except ValueError: pass
     if hide_sold_out:
         q = q.where(Event.sold_out == False)  # noqa: E712
-    # Month — accept "YYYY-MM"
-    if month:
-        try:
-            y, m = month.split("-")
-            y, m = int(y), int(m)
-            from calendar import monthrange
-            first = date(y, m, 1)
-            last  = date(y, m, monthrange(y, m)[1])
-            q = q.where(Event.event_date >= first, Event.event_date <= last)
-        except (ValueError, IndexError):
-            pass
+    # Month — accept "YYYY-MM" string or list of them. OR them together.
+    months_list = _aslist(month)
+    if months_list:
+        from calendar import monthrange
+        from sqlmodel import or_, and_
+        clauses = []
+        for mv in months_list:
+            try:
+                y, m = mv.split("-")
+                y, m = int(y), int(m)
+                first = date(y, m, 1)
+                last = date(y, m, monthrange(y, m)[1])
+                clauses.append(and_(Event.event_date >= first, Event.event_date <= last))
+            except (ValueError, IndexError):
+                continue
+        if clauses:
+            q = q.where(or_(*clauses))
     # Weekdays — SQLite: strftime('%w', date) gives 0..6 with 0=Sunday.
     # We accept names ('Mon'..'Sun') or ints (0=Mon..6=Sun, Python convention).
     if weekdays:
@@ -311,6 +339,10 @@ async def index(request: Request,
                 from_offset: Optional[str] = None,
                 month: Optional[str] = None):
     weekdays = request.query_params.getlist("weekdays")
+    circuits_sel = _multi(request, "circuit")
+    sources_sel  = _multi(request, "source")
+    sessions_sel = _multi(request, "session")
+    months_sel   = _multi(request, "month")
     today = date.today()
     # `from_offset` is the JS pagination cursor — number of days from today
     # where the visible window starts. Default 0 → show today .. today+30d.
@@ -322,12 +354,12 @@ async def index(request: Request,
     win_end   = win_start + timedelta(days=INDEX_PAGE_DAYS)
 
     with db_session() as s:
-        q, sort_key = _filtered_events_query(circuit, vehicle, source, session,
+        q, sort_key = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                              from_, to, max_price, hide_sold_out, sort,
-                                             weekdays=weekdays, month=month)
-        # If user picked a specific month, skip the rolling 30-day window —
+                                             weekdays=weekdays, month=months_sel)
+        # If user picked specific months, skip the rolling 30-day window —
         # just show everything that month.
-        if month:
+        if months_sel:
             windowed = q
             has_more = False
         else:
@@ -343,22 +375,21 @@ async def index(request: Request,
 
         all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
 
-        all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
-
         # Build the Circuit dropdown so it ONLY shows circuits that have at
         # least one event matching the *currently active* Source/Vehicle/Session
         # filters (excluding the Circuit filter itself, so the user can change it).
         def _matches_other_filters(e: Event) -> bool:
             if vehicle and e.vehicle_type != vehicle:
                 return False
-            if session and e.session != session:
+            if sessions_sel and e.session not in sessions_sel:
                 return False
-            if source == "region-uk" and e.region != "UK":
-                return False
-            if source == "region-eu" and e.region != "EU":
-                return False
-            if source and source not in ("region-uk", "region-eu") and e.source != source:
-                return False
+            if sources_sel:
+                hits = []
+                for s_ in sources_sel:
+                    if s_ == "region-uk": hits.append(e.region == "UK")
+                    elif s_ == "region-eu": hits.append(e.region == "EU")
+                    else: hits.append(e.source == s_)
+                if not any(hits): return False
             return True
         circuits = sorted({e.circuit for e in all_events if _matches_other_filters(e)})
 
@@ -393,11 +424,12 @@ async def index(request: Request,
         "sort": sort_key,
         "qs_no_sort": _qs_no_sort(request),
         "filters": {
-            "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
+            "circuits": circuits_sel, "sources": sources_sel, "sessions": sessions_sel,
+            "months": months_sel,
+            "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
             "weekdays": list(weekdays),
-            "month": month,
         },
     })
 
@@ -418,6 +450,10 @@ async def index_chunk(request: Request,
     """Returns rendered <tr>s for the next 30-day window, plus a has_more flag.
     Used by the index page's infinite-scroll JS."""
     weekdays = request.query_params.getlist("weekdays")
+    circuits_sel = _multi(request, "circuit")
+    sources_sel  = _multi(request, "source")
+    sessions_sel = _multi(request, "session")
+    months_sel   = _multi(request, "month")
     today = date.today()
     try:
         offset = max(0, int(from_offset or 0))
@@ -427,10 +463,10 @@ async def index_chunk(request: Request,
     win_end   = win_start + timedelta(days=INDEX_PAGE_DAYS)
 
     with db_session() as s:
-        q, _ = _filtered_events_query(circuit, vehicle, source, session,
+        q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort,
-                                      weekdays=weekdays, month=month)
-        if month:
+                                      weekdays=weekdays, month=months_sel)
+        if months_sel:
             events = s.exec(q).all()
             has_more = False
         else:
@@ -761,19 +797,23 @@ async def calendar_page(request: Request,
     """Month-grid calendar view of all upcoming events. Same filters as index."""
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
     weekdays = request.query_params.getlist("weekdays")
+    circuits_sel = _multi(request, "circuit")
+    sources_sel  = _multi(request, "source")
+    sessions_sel = _multi(request, "session")
+    months_sel   = _multi(request, "month")
     today = date.today()
     # Pick an initial date for the calendar so it lands on the user's filtered
-    # range. Priority: month filter > from_ filter > earliest matching event > today.
+    # range. Priority: first selected month > from_ filter > earliest matching event > today.
     initial_iso = today.isoformat()
-    if month:
-        initial_iso = f"{month}-01"
+    if months_sel:
+        initial_iso = f"{sorted(months_sel)[0]}-01"
     elif from_:
         try: date.fromisoformat(from_); initial_iso = from_
         except ValueError: pass
     with db_session() as s:
-        q, _ = _filtered_events_query(circuit, vehicle, source, session,
+        q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort=None,
-                                      weekdays=weekdays, month=month)
+                                      weekdays=weekdays, month=months_sel)
         events = s.exec(q).all()
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
     # If no explicit date filter set but other filters narrow events, jump to
@@ -802,10 +842,14 @@ async def calendar_page(request: Request,
     # Filter dropdown context (mirror of index)
     def _matches_other_filters(e: Event) -> bool:
         if vehicle and e.vehicle_type != vehicle: return False
-        if session and e.session != session: return False
-        if source == "region-uk" and e.region != "UK": return False
-        if source == "region-eu" and e.region != "EU": return False
-        if source and source not in ("region-uk", "region-eu") and e.source != source: return False
+        if sessions_sel and e.session not in sessions_sel: return False
+        if sources_sel:
+            hits = []
+            for s_ in sources_sel:
+                if s_ == "region-uk": hits.append(e.region == "UK")
+                elif s_ == "region-eu": hits.append(e.region == "EU")
+                else: hits.append(e.source == s_)
+            if not any(hits): return False
         return True
     circuits = sorted({e.circuit for e in all_events_today if _matches_other_filters(e)})
     source_slugs = sorted({e.source for e in all_events_today})
@@ -830,11 +874,12 @@ async def calendar_page(request: Request,
         "months": months,
         "weekday_choices": WEEKDAY_CHOICES,
         "filters": {
-            "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
+            "circuits": circuits_sel, "sources": sources_sel, "sessions": sessions_sel,
+            "months": months_sel,
+            "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
             "weekdays": list(weekdays),
-            "month": month,
         },
     })
 
@@ -856,11 +901,15 @@ async def map_page(request: Request,
     from .circuit_coords import CIRCUIT_COORDS
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
     weekdays = request.query_params.getlist("weekdays")
+    circuits_sel = _multi(request, "circuit")
+    sources_sel  = _multi(request, "source")
+    sessions_sel = _multi(request, "session")
+    months_sel   = _multi(request, "month")
     today = date.today()
     with db_session() as s:
-        q, _ = _filtered_events_query(circuit, vehicle, source, session,
+        q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort=None,
-                                      weekdays=weekdays, month=month)
+                                      weekdays=weekdays, month=months_sel)
         events = s.exec(q).all()
 
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
@@ -868,10 +917,14 @@ async def map_page(request: Request,
     # Build dropdown context (same shape as index)
     def _matches_other_filters(e: Event) -> bool:
         if vehicle and e.vehicle_type != vehicle: return False
-        if session and e.session != session: return False
-        if source == "region-uk" and e.region != "UK": return False
-        if source == "region-eu" and e.region != "EU": return False
-        if source and source not in ("region-uk", "region-eu") and e.source != source: return False
+        if sessions_sel and e.session not in sessions_sel: return False
+        if sources_sel:
+            hits = []
+            for s_ in sources_sel:
+                if s_ == "region-uk": hits.append(e.region == "UK")
+                elif s_ == "region-eu": hits.append(e.region == "EU")
+                else: hits.append(e.source == s_)
+            if not any(hits): return False
         return True
     circuits = sorted({e.circuit for e in all_events_today if _matches_other_filters(e)})
     source_slugs = sorted({e.source for e in all_events_today})
@@ -890,17 +943,18 @@ async def map_page(request: Request,
     # match the active filter set. If not, hide them so the map doesn't
     # mislead the user into thinking the filter applies.
     def _external_passes(name: str) -> bool:
-        # Specific source picked → external venues have no events from any source.
-        if source and source not in ("region-uk", "region-eu"):
+        # Specific organiser slug picked → external venues have no events from any source.
+        real_sources = [s_ for s_ in sources_sel if s_ not in ("region-uk", "region-eu")]
+        if real_sources:
             return False
-        # Region: must match if a region filter is set.
-        if source == "region-uk" and EXTERNAL_REGION.get(name) != "UK": return False
-        if source == "region-eu" and EXTERNAL_REGION.get(name) != "EU": return False
-        # Specific circuit picked → only that circuit's external marker.
-        if circuit and circuit != name: return False
+        # Region: only require match if at least one region pseudo-source is set.
+        if "region-uk" in sources_sel and EXTERNAL_REGION.get(name) != "UK": return False
+        if "region-eu" in sources_sel and EXTERNAL_REGION.get(name) != "EU": return False
+        # Specific circuits picked → only those circuits' external markers.
+        if circuits_sel and name not in circuits_sel: return False
         # Date / month / weekday filters set → we don't know external dates;
         # hide rather than mislead.
-        if from_ or to or month: return False
+        if from_ or to or months_sel: return False
         if weekdays: return False
         # Vehicle: external venues run mixed; pass.
         return True
@@ -943,11 +997,12 @@ async def map_page(request: Request,
         else:
             # Same logic for greyed-out inactive markers: if a specific source
             # or circuit-restricting filter is on, hide them too.
-            if source and source not in ("region-uk", "region-eu"):
+            real_sources = [s_ for s_ in sources_sel if s_ not in ("region-uk", "region-eu")]
+            if real_sources:
                 continue
-            if circuit and circuit != circuit_name:
+            if circuits_sel and circuit_name not in circuits_sel:
                 continue
-            if from_ or to or month or weekdays:
+            if from_ or to or months_sel or weekdays:
                 continue
             inactive_points.append(marker)
 
@@ -963,11 +1018,12 @@ async def map_page(request: Request,
         "months": months,
         "weekday_choices": WEEKDAY_CHOICES,
         "filters": {
-            "circuit": circuit, "vehicle": vehicle, "source": source, "session": session,
+            "circuits": circuits_sel, "sources": sources_sel, "sessions": sessions_sel,
+            "months": months_sel,
+            "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
             "weekdays": list(weekdays),
-            "month": month,
         },
     })
 
