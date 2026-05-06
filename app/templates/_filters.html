@@ -201,8 +201,6 @@
   <label>Max £ <input type="number" name="max_price" value="{{ filters.max_price or '' }}" style="width:80px"></label>
   <label><input type="checkbox" name="hide_sold_out" {% if filters.hide_sold_out %}checked{% endif %}> Hide sold out</label>
   <button type="button" id="clear-filters" class="btn-clear">Clear filters</button>
-  <button type="button" id="save-default" class="btn-clear" title="Save current view + filters as your landing page">★ Save as default</button>
-  <button type="button" id="clear-default" class="btn-clear" hidden title="Clear saved default">✕ Clear default</button>
 </form>
 
 <script>
