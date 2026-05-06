@@ -66,7 +66,7 @@
   {# ------ "When" combined popover: dates + month + weekdays in one button ------ #}
   <label style="position:relative">When
     <button type="button" id="when-trigger" class="when-btn">
-      <span id="when-summary">Any time</span>
+      <span id="when-summary">{% set _m = filters.months[0] if filters.months else None %}{% set _label_map = months|default([])|list %}{% if _m %}{% for v, lbl in _label_map %}{% if v == _m %}{{ lbl }}{% endif %}{% endfor %}{% if filters.weekdays %} · {{ filters.weekdays|join('/') }}{% endif %}{% elif filters.from_ and filters.to %}{{ filters.from_ }} → {{ filters.to }}{% if filters.weekdays %} · {{ filters.weekdays|join('/') }}{% endif %}{% elif filters.from_ %}from {{ filters.from_ }}{% if filters.weekdays %} · {{ filters.weekdays|join('/') }}{% endif %}{% elif filters.weekdays %}{{ filters.weekdays|join('/') }}{% else %}Any time{% endif %}</span>
       <span style="margin-left:6px;color:var(--muted-2)">▾</span>
     </button>
     <div id="when-pop" class="when-pop" hidden>
@@ -179,15 +179,14 @@
         syncMonthChips(); refreshSummary();
         form.submit();
       });
-      // Weekday letter click (toggle, multi-select). Submit on close-of-popover
-      // so the user can pick several without a reload after each.
-      var weekdayDirty = false;
+      // Weekday letter click (toggle). Submits each tick.
       document.getElementById('when-weekdays').addEventListener('click', function (ev) {
         var b = ev.target.closest('.when-chip'); if (!b) return;
         var d = b.dataset.weekday;
         if (selectedDays.has(d)) selectedDays.delete(d); else selectedDays.add(d);
-        weekdayDirty = true;
         syncWeekdayChips(); refreshSummary();
+        syncWeekdayInputs();
+        form.submit();
       });
       // Reflect server-rendered selections immediately at first paint.
       syncMonthChips(); syncWeekdayChips();
@@ -200,14 +199,7 @@
         pop.style.left = left + 'px';
         pop.style.top  = (r.bottom + 6) + 'px';
       }
-      function closePop() {
-        pop.hidden = true;
-        if (weekdayDirty) {
-          syncWeekdayInputs();
-          weekdayDirty = false;
-          form.submit();
-        }
-      }
+      function closePop() { pop.hidden = true; }
       // Register with the global popover registry so opening one closes others.
       window.__filterPops = window.__filterPops || [];
       window.__filterPops.push({ pop: pop, close: closePop });
@@ -262,9 +254,9 @@
     document.getElementById('clear-filters').addEventListener('click', function () { window.location = form.getAttribute('action') || '/'; });
 
     // Generic checkbox-popover wiring (Circuit / Session / Source).
-    // Auto-apply on close: tick as many boxes as you like, then click outside
-    // (or the trigger) to submit. We don't submit on every tick because that
-    // would reload the page after the first checkbox and prevent multi-select.
+    // Submits on every checkbox tick — page reloads with the box checked and
+    // user can come back to the popover to add more. Opening any popover
+    // closes other open ones (cross-popover close).
     document.querySelectorAll('.check-trigger').forEach(function (trigger) {
       var popId = trigger.dataset.target;
       var pop = document.getElementById(popId);
@@ -272,14 +264,9 @@
       var summary = trigger.querySelector('.check-summary');
       var defaultText = summary.dataset.default || 'Any';
       if (pop.parentNode !== document.body) document.body.appendChild(pop);
-      var dirty = false;
-      var initialState = '';
 
       function checkedItems() {
         return Array.from(pop.querySelectorAll('input[type=checkbox]:checked'));
-      }
-      function snapshot() {
-        return checkedItems().map(function (cb) { return cb.value; }).sort().join('|');
       }
       function refreshSummary() {
         var items = checkedItems();
@@ -299,18 +286,12 @@
         pop.style.top  = (r.bottom + 6) + 'px';
         pop.style.width = w + 'px';
       }
-      function close() {
-        pop.hidden = true;
-        if (dirty && snapshot() !== initialState) { form.submit(); }
-        dirty = false;
-      }
+      function close() { pop.hidden = true; }
       trigger.addEventListener('click', function (ev) {
         ev.stopPropagation();
         if (pop.hidden) {
           (window.__filterPops || []).forEach(function (p) { if (p.pop !== pop && !p.pop.hidden) p.close(); });
           pop.hidden = false;
-          initialState = snapshot();
-          dirty = false;
           position();
         } else {
           close();
@@ -326,8 +307,8 @@
         refreshSummary();
         form.submit();
       });
-      pop.addEventListener('change', function () { dirty = true; refreshSummary(); });
-      // Register so opening another popover closes (and submits) this one.
+      // Submit on every checkbox tick.
+      pop.addEventListener('change', function () { refreshSummary(); form.submit(); });
       window.__filterPops = window.__filterPops || [];
       window.__filterPops.push({ pop: pop, close: close });
       refreshSummary();
