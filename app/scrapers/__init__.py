@@ -4,6 +4,7 @@ from . import (
     slipandgrip, trackobsession,
     rsr_nurburg, gedlich, trackdays_events,
     pembrey, llandow, kirkistown,
+    trackday_solutions,
 )
 
 SCRAPERS = {
@@ -26,6 +27,7 @@ SCRAPERS = {
     "pembrey": pembrey,
     "llandow": llandow,
     "kirkistown": kirkistown,
+    "trackday_solutions": trackday_solutions,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -50,6 +52,7 @@ ORGANISER_DISPLAY = {
     "pembrey": "Pembrey Circuit",
     "llandow": "Llandow Circuit",
     "kirkistown": "Kirkistown Racing Circuit",
+    "trackday_solutions": "Trackday Solutions",
 }
 
 # Region grouping for the dropdown (UK first, EU after).
@@ -64,5 +67,6 @@ SOURCE_REGION = {
     "nurburgring_tf": "EU",
     "pembrey": "UK",
     "llandow": "UK",
+    "trackday_solutions": "UK",
     "kirkistown": "UK",
 }
