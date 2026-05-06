@@ -196,6 +196,7 @@
           // Picking a month clears any date range
           fromI.value = ''; toI.value = ''; fp.clear();
         }
+        syncMonthChips();
         refreshSummary();
       });
       // Weekday letter clicks (toggle)
@@ -204,7 +205,12 @@
         var d = b.dataset.weekday;
         if (selectedDays.has(d)) selectedDays.delete(d); else selectedDays.add(d);
         syncWeekdayChips();
+        refreshSummary();
       });
+      // Reflect server-rendered selections on chips at first paint, not just
+      // when the popover opens — otherwise clicking a chip toggles state
+      // visually but the *initial* selected chips look unselected.
+      syncMonthChips(); syncWeekdayChips();
       // Open/close popover. Pop is position:fixed and re-attached to <body>
       // so it can escape the filter bar's overflow:auto clipping.
       if (pop.parentNode !== document.body) document.body.appendChild(pop);
@@ -272,17 +278,24 @@
     document.getElementById('clear-filters').addEventListener('click', function () { window.location = form.getAttribute('action') || '/'; });
 
     // Generic checkbox-popover wiring (Circuit / Session / Source).
+    // Auto-apply on close: tick as many boxes as you like, then click outside
+    // (or the trigger) to submit. We don't submit on every tick because that
+    // would reload the page after the first checkbox and prevent multi-select.
     document.querySelectorAll('.check-trigger').forEach(function (trigger) {
       var popId = trigger.dataset.target;
       var pop = document.getElementById(popId);
       if (!pop) return;
       var summary = trigger.querySelector('.check-summary');
       var defaultText = summary.dataset.default || 'Any';
-      // Re-attach to body so it escapes the filter bar's overflow:auto.
       if (pop.parentNode !== document.body) document.body.appendChild(pop);
+      var dirty = false;
+      var initialState = '';
 
       function checkedItems() {
         return Array.from(pop.querySelectorAll('input[type=checkbox]:checked'));
+      }
+      function snapshot() {
+        return checkedItems().map(function (cb) { return cb.value; }).sort().join('|');
       }
       function refreshSummary() {
         var items = checkedItems();
@@ -302,14 +315,26 @@
         pop.style.top  = (r.bottom + 6) + 'px';
         pop.style.width = w + 'px';
       }
+      function close() {
+        pop.hidden = true;
+        if (dirty && snapshot() !== initialState) { form.submit(); }
+        dirty = false;
+      }
       trigger.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        if (pop.hidden) { pop.hidden = false; position(); } else { pop.hidden = true; }
+        if (pop.hidden) {
+          pop.hidden = false;
+          initialState = snapshot();
+          dirty = false;
+          position();
+        } else {
+          close();
+        }
       });
       window.addEventListener('resize', function () { if (!pop.hidden) position(); });
       window.addEventListener('scroll', function () { if (!pop.hidden) position(); }, true);
       document.addEventListener('click', function (ev) {
-        if (!pop.hidden && !pop.contains(ev.target) && !trigger.contains(ev.target)) pop.hidden = true;
+        if (!pop.hidden && !pop.contains(ev.target) && !trigger.contains(ev.target)) close();
       });
       pop.querySelector('.check-clear').addEventListener('click', function () {
         pop.querySelectorAll('input[type=checkbox]').forEach(function (cb) { cb.checked = false; });
@@ -317,8 +342,7 @@
         form.submit();
       });
       pop.querySelector('.check-apply').addEventListener('click', function () { form.submit(); });
-      // Update summary live as boxes are ticked, but don't submit until Apply.
-      pop.addEventListener('change', refreshSummary);
+      pop.addEventListener('change', function () { dirty = true; refreshSummary(); });
       refreshSummary();
     });
 
