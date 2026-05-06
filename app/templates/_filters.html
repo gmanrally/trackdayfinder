@@ -16,7 +16,6 @@
       </div>
       <div class="check-actions">
         <button type="button" class="btn-clear check-clear" style="font-size:12px;padding:5px 10px">Clear</button>
-        <button type="button" class="book-btn check-apply" style="font-size:12px;padding:5px 14px">Apply</button>
       </div>
     </div>
   </label>
@@ -40,7 +39,6 @@
       </div>
       <div class="check-actions">
         <button type="button" class="btn-clear check-clear" style="font-size:12px;padding:5px 10px">Clear</button>
-        <button type="button" class="book-btn check-apply" style="font-size:12px;padding:5px 14px">Apply</button>
       </div>
     </div>
   </label>
@@ -62,7 +60,6 @@
       </div>
       <div class="check-actions">
         <button type="button" class="btn-clear check-clear" style="font-size:12px;padding:5px 10px">Clear</button>
-        <button type="button" class="book-btn check-apply" style="font-size:12px;padding:5px 14px">Apply</button>
       </div>
     </div>
   </label>
@@ -94,20 +91,20 @@
           {% endfor %}
         </div>
       </div>
-      <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-top:1px solid var(--line)">
-        <button type="button" id="when-clear" class="btn-clear" style="font-size:12px;padding:5px 10px">Clear</button>
-        <button type="button" id="when-apply" class="book-btn" style="font-size:12px;padding:5px 14px">Apply</button>
+      <div style="padding:10px 12px;border-top:1px solid var(--line);text-align:right">
+        <button type="button" id="when-clear" class="btn-clear" style="font-size:12px;padding:5px 10px">Clear all</button>
       </div>
     </div>
   </label>
   <input type="hidden" id="from-input" name="from_" value="{{ filters.from_ or '' }}">
   <input type="hidden" id="to-input"   name="to"    value="{{ filters.to or '' }}">
-  {% for m in (filters.months or []) %}<input type="hidden" name="month" value="{{ m }}">{% endfor %}
+  <input type="hidden" id="month-input" name="month" value="{% if filters.months %}{{ filters.months[0] }}{% endif %}">
   {% for d in (filters.weekdays or []) %}<input type="hidden" name="weekdays" value="{{ d }}">{% endfor %}
   <script>
     (function () {
       var fromI = document.getElementById('from-input');
       var toI   = document.getElementById('to-input');
+      var monthI = document.getElementById('month-input');
       var rangeI = document.getElementById('date-range');
       var trigger = document.getElementById('when-trigger');
       var pop = document.getElementById('when-pop');
@@ -115,10 +112,10 @@
       var form = document.querySelector('form.filters');
       var todayIso = '{{ today_iso }}';
       var monthLabels = {
+        '': 'Any',
         {% for val, label in (months or []) %}'{{ val }}': '{{ label }}',{% endfor %}
       };
-      // Selected months/weekdays start from server-rendered hidden inputs.
-      var selectedMonths = new Set([{% for m in (filters.months or []) %}'{{ m }}',{% endfor %}]);
+      // Selected weekdays start from server-rendered hidden inputs.
       var selectedDays = new Set([{% for d in (filters.weekdays or []) %}'{{ d }}',{% endfor %}]);
 
       function formatISO(d) {
@@ -126,10 +123,8 @@
       }
       function refreshSummary() {
         var parts = [];
-        if (selectedMonths.size) {
-          var ms = [...selectedMonths].sort().map(m => monthLabels[m] || m);
-          parts.push(ms.length <= 2 ? ms.join(', ') : ms.length + ' months');
-        } else if (fromI.value && toI.value) {
+        if (monthI.value) parts.push(monthLabels[monthI.value] || monthI.value);
+        else if (fromI.value && toI.value) {
           parts.push(rangeI.value || (fromI.value + ' → ' + toI.value));
         } else if (fromI.value) {
           parts.push('from ' + (rangeI.value || fromI.value));
@@ -149,20 +144,9 @@
           form.appendChild(i);
         });
       }
-      function syncMonthInputs() {
-        document.querySelectorAll('input[type=hidden][name="month"]').forEach(n => n.remove());
-        selectedMonths.forEach(m => {
-          var i = document.createElement('input');
-          i.type='hidden'; i.name='month'; i.value=m;
-          form.appendChild(i);
-        });
-      }
       function syncMonthChips() {
         document.querySelectorAll('#when-months .when-chip').forEach(b => {
-          var v = b.dataset.month || '';
-          // The "Any" chip is on when no months are selected.
-          if (v === '') b.classList.toggle('on', selectedMonths.size === 0);
-          else b.classList.toggle('on', selectedMonths.has(v));
+          b.classList.toggle('on', (b.dataset.month || '') === monthI.value);
         });
       }
       function syncWeekdayChips() {
@@ -170,7 +154,7 @@
           b.classList.toggle('on', selectedDays.has(b.dataset.weekday));
         });
       }
-      // Init flatpickr inside popover, no auto-submit (user clicks Apply).
+      // Init flatpickr inside popover. onChange auto-submits.
       var defaults = [];
       if (fromI.value) defaults.push(fromI.value);
       if (toI.value)   defaults.push(toI.value);
@@ -180,39 +164,34 @@
         onChange: function (sel) {
           fromI.value = sel[0] ? formatISO(sel[0]) : '';
           toI.value   = sel[1] ? formatISO(sel[1]) : '';
-          // Picking a date range clears any selected months
-          if (sel.length) { selectedMonths.clear(); syncMonthChips(); }
+          // Picking a date range clears any selected month.
+          // Submit only when both ends are set so the calendar isn't fired
+          // mid-pick; if user just clears the range we submit immediately.
+          if (sel.length === 2) { monthI.value = ''; form.submit(); }
+          else if (sel.length === 0 && (fromI.dataset.had || toI.dataset.had)) { form.submit(); }
         }
       });
-      // Month chip clicks (multi-select; "Any" chip clears all)
+      // Month chip click (single-select; "Any" chip clears).
       document.getElementById('when-months').addEventListener('click', function (ev) {
         var b = ev.target.closest('.when-chip'); if (!b) return;
-        var v = b.dataset.month || '';
-        if (v === '') {
-          selectedMonths.clear();
-        } else {
-          if (selectedMonths.has(v)) selectedMonths.delete(v);
-          else selectedMonths.add(v);
-          // Picking a month clears any date range
-          fromI.value = ''; toI.value = ''; fp.clear();
-        }
-        syncMonthChips();
-        refreshSummary();
+        monthI.value = b.dataset.month || '';
+        if (monthI.value) { fromI.value = ''; toI.value = ''; fp.clear(); }
+        syncMonthChips(); refreshSummary();
+        form.submit();
       });
-      // Weekday letter clicks (toggle)
+      // Weekday letter click (toggle, multi-select). Submit on close-of-popover
+      // so the user can pick several without a reload after each.
+      var weekdayDirty = false;
       document.getElementById('when-weekdays').addEventListener('click', function (ev) {
         var b = ev.target.closest('.when-chip'); if (!b) return;
         var d = b.dataset.weekday;
         if (selectedDays.has(d)) selectedDays.delete(d); else selectedDays.add(d);
-        syncWeekdayChips();
-        refreshSummary();
+        weekdayDirty = true;
+        syncWeekdayChips(); refreshSummary();
       });
-      // Reflect server-rendered selections on chips at first paint, not just
-      // when the popover opens — otherwise clicking a chip toggles state
-      // visually but the *initial* selected chips look unselected.
+      // Reflect server-rendered selections immediately at first paint.
       syncMonthChips(); syncWeekdayChips();
-      // Open/close popover. Pop is position:fixed and re-attached to <body>
-      // so it can escape the filter bar's overflow:auto clipping.
+      // Position + open/close. Re-attach to body so it escapes overflow clipping.
       if (pop.parentNode !== document.body) document.body.appendChild(pop);
       function positionPop() {
         var r = trigger.getBoundingClientRect();
@@ -221,35 +200,40 @@
         pop.style.left = left + 'px';
         pop.style.top  = (r.bottom + 6) + 'px';
       }
+      function closePop() {
+        pop.hidden = true;
+        if (weekdayDirty) {
+          syncWeekdayInputs();
+          weekdayDirty = false;
+          form.submit();
+        }
+      }
+      // Register with the global popover registry so opening one closes others.
+      window.__filterPops = window.__filterPops || [];
+      window.__filterPops.push({ pop: pop, close: closePop });
       trigger.addEventListener('click', function (ev) {
         ev.stopPropagation();
         if (pop.hidden) {
+          window.__filterPops.forEach(function (p) { if (p.pop !== pop && !p.pop.hidden) p.close(); });
           pop.hidden = false;
           positionPop();
           syncMonthChips(); syncWeekdayChips();
         } else {
-          pop.hidden = true;
+          closePop();
         }
       });
       window.addEventListener('resize', function () { if (!pop.hidden) positionPop(); });
       window.addEventListener('scroll', function () { if (!pop.hidden) positionPop(); }, true);
       document.addEventListener('click', function (ev) {
-        if (!pop.hidden && !pop.contains(ev.target) && !trigger.contains(ev.target)) {
-          pop.hidden = true;
-        }
+        if (!pop.hidden && !pop.contains(ev.target) && !trigger.contains(ev.target)) closePop();
       });
-      // Clear button — wipe all "when" state and submit
+      // Clear button — wipe all "when" state and submit.
       document.getElementById('when-clear').addEventListener('click', function () {
-        fromI.value = ''; toI.value = '';
-        selectedMonths.clear(); selectedDays.clear();
+        fromI.value = ''; toI.value = ''; monthI.value = '';
+        selectedDays.clear();
         fp.clear();
         syncMonthChips(); syncWeekdayChips();
-        syncMonthInputs(); syncWeekdayInputs();
-        form.submit();
-      });
-      // Apply button — write hidden inputs and submit
-      document.getElementById('when-apply').addEventListener('click', function () {
-        syncMonthInputs(); syncWeekdayInputs();
+        syncWeekdayInputs();
         form.submit();
       });
       refreshSummary();
@@ -323,6 +307,7 @@
       trigger.addEventListener('click', function (ev) {
         ev.stopPropagation();
         if (pop.hidden) {
+          (window.__filterPops || []).forEach(function (p) { if (p.pop !== pop && !p.pop.hidden) p.close(); });
           pop.hidden = false;
           initialState = snapshot();
           dirty = false;
@@ -341,8 +326,10 @@
         refreshSummary();
         form.submit();
       });
-      pop.querySelector('.check-apply').addEventListener('click', function () { form.submit(); });
       pop.addEventListener('change', function () { dirty = true; refreshSummary(); });
+      // Register so opening another popover closes (and submits) this one.
+      window.__filterPops = window.__filterPops || [];
+      window.__filterPops.push({ pop: pop, close: close });
       refreshSummary();
     });
 
