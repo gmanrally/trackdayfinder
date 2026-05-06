@@ -279,15 +279,19 @@
     // window so both this IIFE and the When-popover IIFE can call it.
     window.__applyFilters = function () {
       var params = new URLSearchParams();
-      // 1) Inputs that are real descendants of the form (Vehicle, Max £,
-      //    Hide-sold-out, hidden from_, to, weekdays, month).
+      // Names owned by the popovers — we read these only from the popovers
+      // (not from FormData) to avoid double-counting when HTML5 form= keeps
+      // the checkbox associated with the form.
+      var POPOVER_NAMES = new Set(['circuit', 'session', 'source']);
+      // 1) Form descendants minus popover-owned names.
       var fd = new FormData(form);
       for (var pair of fd.entries()) {
         var k = pair[0], v = pair[1];
         if (v === '' || v == null) continue;
+        if (POPOVER_NAMES.has(k)) continue;
         params.append(k, v);
       }
-      // 2) Reparented popover checkboxes — read directly from the DOM.
+      // 2) Popover checkboxes — single source of truth for these names.
       document.querySelectorAll('.check-pop input[type=checkbox]:checked').forEach(function (cb) {
         params.append(cb.name, cb.value);
       });
