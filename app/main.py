@@ -357,9 +357,12 @@ async def index(request: Request,
         q, sort_key = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                              from_, to, max_price, hide_sold_out, sort,
                                              weekdays=weekdays, month=months_sel)
-        # If user picked specific months, skip the rolling 30-day window —
-        # just show everything that month.
-        if months_sel:
+        # If the user is actively filtering, skip the rolling 30-day window
+        # so they don't get a misleading "0 results" when matching events
+        # exist further in the future.
+        any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
+                          or vehicle or from_ or to or weekdays)
+        if any_filter:
             windowed = q
             has_more = False
         else:
@@ -466,7 +469,9 @@ async def index_chunk(request: Request,
         q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort,
                                       weekdays=weekdays, month=months_sel)
-        if months_sel:
+        any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
+                          or vehicle or from_ or to or weekdays)
+        if any_filter:
             events = s.exec(q).all()
             has_more = False
         else:
