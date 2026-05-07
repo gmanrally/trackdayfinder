@@ -215,9 +215,13 @@
         pop.style.left = left + 'px';
         pop.style.top  = (r.bottom + 6) + 'px';
       }
+      // Register with the shared popover registry so opening one closes others.
+      window.__filterPops = window.__filterPops || [];
+      window.__filterPops.push({ pop: pop, close: function () { pop.hidden = true; } });
       trigger.addEventListener('click', function (ev) {
         ev.stopPropagation();
         if (pop.hidden) {
+          (window.__filterPops || []).forEach(function (p) { if (p.pop !== pop) p.close(); });
           pop.hidden = false;
           positionPop();
           syncMonthChips(); syncWeekdayChips();
@@ -332,9 +336,17 @@
         pop.style.top  = (r.bottom + 6) + 'px';
         pop.style.width = w + 'px';
       }
+      window.__filterPops = window.__filterPops || [];
+      window.__filterPops.push({ pop: pop, close: function () { pop.hidden = true; } });
       trigger.addEventListener('click', function (ev) {
         ev.stopPropagation();
-        if (pop.hidden) { pop.hidden = false; position(); } else { pop.hidden = true; }
+        if (pop.hidden) {
+          (window.__filterPops || []).forEach(function (p) { if (p.pop !== pop) p.close(); });
+          pop.hidden = false;
+          position();
+        } else {
+          pop.hidden = true;
+        }
       });
       window.addEventListener('resize', function () { if (!pop.hidden) position(); });
       window.addEventListener('scroll', function () { if (!pop.hidden) position(); }, true);
