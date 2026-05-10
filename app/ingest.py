@@ -9,6 +9,25 @@ from .scrapers import SCRAPERS
 from .circuit_noise import CIRCUIT_STATIC_NOISE_DB
 
 
+def _infer_session(session: str | None, title: str | None, notes: str | None) -> str | None:
+    """If the scraper said 'day' (or nothing) but the title/notes suggest
+    a partial-day session, refine it. Trust an explicit non-'day' value."""
+    if session and session not in ("day", "", None):
+        return session
+    blob = " ".join(filter(None, [title, notes])).lower()
+    if not blob:
+        return session
+    if "evening" in blob or "twilight" in blob:
+        return "evening"
+    if "am only" in blob or "morning" in blob or "am session" in blob:
+        return "am"
+    if "pm only" in blob or "afternoon" in blob or "pm session" in blob:
+        return "pm"
+    if "half day" in blob or "half-day" in blob or "am+pm" in blob or "am/pm" in blob:
+        return "am_pm"
+    return session or "day"
+
+
 async def run_one(slug: str) -> tuple[int, str | None]:
     init_db()
     module = SCRAPERS[slug]
@@ -52,7 +71,11 @@ async def run_one(slug: str) -> tuple[int, str | None]:
                 ev.spaces_left = raw.spaces_left
                 ev.stock_status = raw.stock_status
                 ev.notes = raw.notes
-                ev.session = raw.session
+                # Infer partial-day session from title text when the scraper
+                # only said "day" (or didn't say). Lots of MSV / NoLimits /
+                # nurburgring_tf events are evenings/twilights/AM-only and
+                # were being lumped in with full-day events.
+                ev.session = _infer_session(raw.session, raw.title, raw.notes)
                 ev.is_package = raw.is_package
                 ev.region = raw.region or "UK"
                 ev.last_seen = datetime.utcnow()
