@@ -6,6 +6,7 @@ from sqlmodel import select
 from .models import Event, ScrapeRun, EventSnapshot, init_db, session
 from .normalise import canonical_circuit, parse_price, parse_noise, make_dedup_key, to_gbp
 from .scrapers import SCRAPERS
+from .circuit_noise import CIRCUIT_STATIC_NOISE_DB
 
 
 async def run_one(slug: str) -> tuple[int, str | None]:
@@ -45,7 +46,8 @@ async def run_one(slug: str) -> tuple[int, str | None]:
                 ev.price_native = native_price
                 ev.currency = (raw.currency or "GBP").upper()
                 ev.price_gbp = to_gbp(native_price, ev.currency)
-                ev.noise_limit_db = parse_noise(raw.noise_text or "")
+                ev.noise_limit_db = (parse_noise(raw.noise_text or "")
+                                     or CIRCUIT_STATIC_NOISE_DB.get(circuit))
                 ev.sold_out = raw.sold_out
                 ev.spaces_left = raw.spaces_left
                 ev.stock_status = raw.stock_status
