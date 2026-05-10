@@ -4,7 +4,7 @@ from . import (
     slipandgrip, trackobsession,
     rsr_nurburg, gedlich, trackdays_events,
     pembrey, llandow, kirkistown,
-    trackday_solutions, curbstone,
+    trackday_solutions, curbstone, lotus_on_track,
 )
 
 SCRAPERS = {
@@ -29,6 +29,7 @@ SCRAPERS = {
     "kirkistown": kirkistown,
     "trackday_solutions": trackday_solutions,
     "curbstone": curbstone,
+    "lotus_on_track": lotus_on_track,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -55,6 +56,7 @@ ORGANISER_DISPLAY = {
     "kirkistown": "Kirkistown Racing Circuit",
     "trackday_solutions": "Trackday Solutions",
     "curbstone": "Curbstone Track Events",
+    "lotus_on_track": "Lotus on Track",
 }
 
 # Region grouping for the dropdown (UK first, EU after).
@@ -71,5 +73,6 @@ SOURCE_REGION = {
     "llandow": "UK",
     "trackday_solutions": "UK",
     "curbstone": "EU",
+    "lotus_on_track": "UK",
     "kirkistown": "UK",
 }
