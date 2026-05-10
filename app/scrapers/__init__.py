@@ -4,7 +4,7 @@ from . import (
     slipandgrip, trackobsession,
     rsr_nurburg, gedlich, trackdays_events,
     pembrey, llandow, kirkistown,
-    trackday_solutions, curbstone, lotus_on_track, df_trackdays, skylimit,
+    trackday_solutions, curbstone, lotus_on_track, df_trackdays, skylimit, europa,
 )
 
 SCRAPERS = {
@@ -32,6 +32,7 @@ SCRAPERS = {
     "lotus_on_track": lotus_on_track,
     "df_trackdays": df_trackdays,
     "skylimit": skylimit,
+    "europa": europa,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -61,6 +62,7 @@ ORGANISER_DISPLAY = {
     "lotus_on_track": "Lotus on Track",
     "df_trackdays": "DF Trackdays",
     "skylimit": "Skylimit Events",
+    "europa": "Europa Trackdays (aggregator)",
 }
 
 # Region grouping for the dropdown (UK first, EU after).
@@ -80,5 +82,6 @@ SOURCE_REGION = {
     "lotus_on_track": "UK",
     "df_trackdays": "EU",
     "skylimit": "EU",
+    "europa": "EU",
     "kirkistown": "UK",
 }
