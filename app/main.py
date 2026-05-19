@@ -20,6 +20,7 @@ CANONICAL_HOST = "https://trackdayfinder.co.uk"
 
 # Feature flags. Hidden from public unless explicitly enabled.
 ALERTS_ENABLED = os.environ.get("ALERTS_ENABLED", "").strip() == "1"
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()
 
 
 def slugify(s: str) -> str:
@@ -1221,24 +1222,99 @@ async def robots():
     )
 
 
+_BOT_UA_RE = re.compile(
+    r"(bot|crawl|spider|slurp|bing(?!-image)|baidu|yandex|duckduck|"
+    r"facebookexternalhit|facebookcatalog|twitterbot|linkedinbot|slackbot|"
+    r"discordbot|whatsapp|telegrambot|pinterestbot|skypeuripreview|"
+    r"embedly|iframely|redditbot|vkshare|w3c_validator|"
+    r"applebot|mastodon|bluesky|google-imageproxy|petalbot|amazonbot|"
+    r"semrushbot|ahrefsbot|mj12bot|dataforseo|dotbot|httpx|wget|curl|"
+    r"python-requests|go-http-client|java/|ruby|scrapy|monitoring|uptimerobot|"
+    r"headlesschrome|phantomjs|puppeteer)",
+    re.I,
+)
+
+
+def _looks_like_bot(ua: str) -> bool:
+    return bool(_BOT_UA_RE.search(ua or ""))
+
+
 @app.get("/go/{event_id}")
 async def click_through(request: Request, event_id: int):
-    """Logged redirect to the organiser's booking page. Records click then 302s."""
+    """Logged redirect to the organiser's booking page. Records click then 302s.
+    Skips the Click insert for bot/crawler user-agents — they bias the stats
+    heavily and we don't redirect for genuine human interest."""
     from starlette.responses import RedirectResponse
+    ua = request.headers.get("user-agent") or ""
     with db_session() as s:
         ev = s.exec(select(Event).where(Event.id == event_id)).first()
         if not ev:
             raise HTTPException(status_code=404, detail="Event not found")
-        s.add(Click(
-            event_id=event_id,
-            source=ev.source,
-            circuit=ev.circuit,
-            referrer=request.headers.get("referer"),
-            user_agent=(request.headers.get("user-agent") or "")[:200],
-        ))
-        s.commit()
+        if not _looks_like_bot(ua):
+            s.add(Click(
+                event_id=event_id,
+                source=ev.source,
+                circuit=ev.circuit,
+                referrer=request.headers.get("referer"),
+                user_agent=ua[:200],
+            ))
+            s.commit()
         target = ev.booking_url
     return RedirectResponse(target, status_code=302)
+
+
+@app.get("/admin/clicks", response_class=HTMLResponse)
+async def admin_clicks(request: Request, token: Optional[str] = None,
+                       days: Optional[int] = None):
+    """Internal dashboard of outbound-booking clicks. Gated by ?token=<ADMIN_TOKEN>
+    matching the ADMIN_TOKEN env var. Returns 404 when the env var is unset (so
+    the route is invisible until you opt in) or when the token doesn't match."""
+    from .models import Click
+    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+        raise HTTPException(status_code=404, detail="Not Found")
+    from collections import Counter
+    from datetime import timedelta
+    with db_session() as s:
+        clicks = s.exec(select(Click).order_by(Click.clicked_at.desc())).all()
+        events = {e.id: e for e in s.exec(select(Event)).all()}
+    total = len(clicks)
+    by_source = Counter(); by_circuit = Counter(); by_event: Counter = Counter()
+    now = datetime.utcnow()
+    last7 = sum(1 for c in clicks if c.clicked_at >= now - timedelta(days=7))
+    last30 = sum(1 for c in clicks if c.clicked_at >= now - timedelta(days=30))
+    for c in clicks:
+        e = events.get(c.event_id)
+        if not e: continue
+        by_source[e.source] += 1
+        by_circuit[e.circuit] += 1
+        by_event[(e.id, e.event_date.isoformat(), e.circuit, e.organiser)] += 1
+    # Daily counts for the last 30 days
+    daily: dict[str, int] = {}
+    for c in clicks:
+        if c.clicked_at >= now - timedelta(days=30):
+            daily[c.clicked_at.strftime("%Y-%m-%d")] = daily.get(c.clicked_at.strftime("%Y-%m-%d"), 0) + 1
+    daily_sorted = sorted(daily.items())
+    recent = []
+    for c in clicks[:50]:
+        e = events.get(c.event_id)
+        recent.append({
+            "at": c.clicked_at.strftime("%Y-%m-%d %H:%M"),
+            "source": e.source if e else "?",
+            "organiser": e.organiser if e else "?",
+            "circuit": e.circuit if e else "?",
+            "event_date": e.event_date.isoformat() if e else "?",
+            "referrer": (c.referrer or "")[:60],
+        })
+    return templates.TemplateResponse(request, "admin_clicks.html", {
+        "total": total, "last7": last7, "last30": last30,
+        "by_source": by_source.most_common(20),
+        "by_circuit": by_circuit.most_common(20),
+        "by_event": [(t[1], t[2], t[3], n) for t, n in by_event.most_common(20)],
+        "daily": daily_sorted,
+        "recent": recent,
+        "now_year": date.today().year,
+        "token": token,
+    })
 
 
 @app.get("/api/events")

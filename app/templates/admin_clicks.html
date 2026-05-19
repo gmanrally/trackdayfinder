@@ -1,0 +1,90 @@
+{% extends "_base.html" %}
+
+{% block title %}Admin · Clicks | TrackdayFinder{% endblock %}
+{% block meta_description %}Internal click stats.{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>Click stats</h1>
+  <p class="lede">Outbound clicks to organiser booking pages, via /go/&lt;id&gt;.</p>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:18px 0">
+    <div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px">
+      <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Total</div>
+      <div style="font-size:28px;font-weight:700">{{ total }}</div>
+    </div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px">
+      <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Last 7 days</div>
+      <div style="font-size:28px;font-weight:700">{{ last7 }}</div>
+    </div>
+    <div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px">
+      <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em">Last 30 days</div>
+      <div style="font-size:28px;font-weight:700">{{ last30 }}</div>
+    </div>
+  </div>
+
+  {% if daily %}
+  <h2>Daily, last 30 days</h2>
+  <div style="display:flex;align-items:flex-end;gap:3px;height:120px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:10px;overflow-x:auto">
+    {% set _max = daily | map(attribute=1) | max %}
+    {% for d, n in daily %}
+      <div title="{{ d }}: {{ n }}" style="flex:0 0 18px;display:flex;flex-direction:column;align-items:center;gap:3px">
+        <div style="width:14px;background:var(--accent);height:{{ (n / _max * 100) | round(0) }}px;min-height:2px;border-radius:2px 2px 0 0"></div>
+        <div style="font-size:9px;color:var(--muted);transform:rotate(-60deg);transform-origin:left;white-space:nowrap">{{ d[5:] }}</div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:24px">
+    <div>
+      <h2>Top organisers</h2>
+      <table style="width:100%">
+        <thead><tr><th>Organiser</th><th class="right">Clicks</th></tr></thead>
+        <tbody>
+          {% for slug, n in by_source %}
+          <tr><td>{{ slug }}</td><td class="right">{{ n }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h2>Top circuits</h2>
+      <table style="width:100%">
+        <thead><tr><th>Circuit</th><th class="right">Clicks</th></tr></thead>
+        <tbody>
+          {% for name, n in by_circuit %}
+          <tr><td>{{ name }}</td><td class="right">{{ n }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h2 style="margin-top:24px">Top individual events</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Circuit</th><th>Organiser</th><th class="right">Clicks</th></tr></thead>
+    <tbody>
+    {% for d, circ, org, n in by_event %}
+      <tr><td>{{ d }}</td><td>{{ circ }}</td><td>{{ org }}</td><td class="right">{{ n }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:24px">Recent (last 50)</h2>
+  <table>
+    <thead><tr><th>When</th><th>Source</th><th>Circuit</th><th>Event date</th><th>Referrer</th></tr></thead>
+    <tbody>
+    {% for c in recent %}
+      <tr>
+        <td>{{ c.at }}</td>
+        <td>{{ c.source }}</td>
+        <td>{{ c.circuit }}</td>
+        <td>{{ c.event_date }}</td>
+        <td style="color:var(--muted);font-size:12px">{{ c.referrer or '—' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</article>
+{% endblock %}
