@@ -202,6 +202,13 @@
   }
 
   /* Generic checkbox-popover (Circuit / Session / Source). */
+  .check-search-row { padding:8px 10px; border-bottom:1px solid var(--line); }
+  .check-search {
+    width:100%; padding:6px 8px; font:13px 'Inter', system-ui, sans-serif;
+    color:var(--fg); background:#fff; border:1px solid var(--line-2);
+    border-radius:6px; outline:none;
+  }
+  .check-search:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(220,38,38,0.15); }
   .check-item {
     display:flex; align-items:center; gap:8px; padding:6px 4px;
     font:13px 'Inter', system-ui, sans-serif; color:var(--fg);

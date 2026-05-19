@@ -9,7 +9,8 @@
       <span style="margin-left:6px;color:var(--muted-2)">▾</span>
     </button>
     <div id="circuit-pop" class="when-pop check-pop" hidden data-name="circuit">
-      <div class="when-section" style="max-height:280px;overflow-y:auto">
+      <div class="check-search-row"><input type="text" class="check-search" placeholder="Type to filter circuits…" autocomplete="off"></div>
+      <div class="when-section check-list" style="max-height:280px;overflow-y:auto">
         {% for c in circuits %}
         <label class="check-item"><input type="checkbox" form="filters-form" name="circuit" value="{{ c }}" {% if c in (filters.circuits or []) %}checked{% endif %}> {{ c }}</label>
         {% endfor %}
@@ -50,7 +51,8 @@
       <span style="margin-left:6px;color:var(--muted-2)">▾</span>
     </button>
     <div id="source-pop" class="when-pop check-pop" hidden data-name="source">
-      <div class="when-section" style="max-height:300px;overflow-y:auto">
+      <div class="check-search-row"><input type="text" class="check-search" placeholder="Type to filter organisers…" autocomplete="off"></div>
+      <div class="when-section check-list" style="max-height:300px;overflow-y:auto">
         <label class="check-item"><input type="checkbox" form="filters-form" name="source" value="region-uk" {% if 'region-uk' in (filters.sources or []) %}checked{% endif %}> All UK organisers</label>
         <label class="check-item"><input type="checkbox" form="filters-form" name="source" value="region-eu" {% if 'region-eu' in (filters.sources or []) %}checked{% endif %}> All European organisers</label>
         {% for group_label, items in sources_grouped %}
@@ -338,12 +340,37 @@
       }
       window.__filterPops = window.__filterPops || [];
       window.__filterPops.push({ pop: pop, close: function () { pop.hidden = true; } });
+      // Type-to-filter the checkbox list (Circuit + Source popovers).
+      var searchInput = pop.querySelector('.check-search');
+      var labels = Array.from(pop.querySelectorAll('label.check-item'));
+      var groups = Array.from(pop.querySelectorAll('.check-group'));
+      function applySearch() {
+        if (!searchInput) return;
+        var q = searchInput.value.trim().toLowerCase();
+        labels.forEach(function (lbl) {
+          var t = lbl.textContent.toLowerCase();
+          lbl.style.display = (!q || t.indexOf(q) !== -1) ? '' : 'none';
+        });
+        // Hide group headers whose following labels are all hidden.
+        groups.forEach(function (g) {
+          var n = g.nextElementSibling;
+          var anyVisible = false;
+          while (n && !n.classList.contains('check-group')) {
+            if (n.tagName === 'LABEL' && n.style.display !== 'none') { anyVisible = true; break; }
+            n = n.nextElementSibling;
+          }
+          g.style.display = anyVisible ? '' : 'none';
+        });
+      }
+      if (searchInput) searchInput.addEventListener('input', applySearch);
+
       trigger.addEventListener('click', function (ev) {
         ev.stopPropagation();
         if (pop.hidden) {
           (window.__filterPops || []).forEach(function (p) { if (p.pop !== pop) p.close(); });
           pop.hidden = false;
           position();
+          if (searchInput) { searchInput.value = ''; applySearch(); setTimeout(function () { searchInput.focus(); }, 0); }
         } else {
           pop.hidden = true;
         }
