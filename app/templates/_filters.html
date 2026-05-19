@@ -256,6 +256,20 @@
       refreshSummary();
     })();
   </script>
+  <label>Within
+    <span style="display:inline-flex;gap:4px;align-items:center">
+      <input type="text" name="postcode" value="{{ filters.postcode or '' }}" placeholder="UK postcode" maxlength="8" style="width:110px;text-transform:uppercase" autocomplete="postal-code">
+      <select name="radius_mi" style="width:74px">
+        {% set _r = filters.radius_mi or '' %}
+        <option value=""    {% if _r == '' %}selected{% endif %}>Any</option>
+        <option value="25"  {% if _r == '25' %}selected{% endif %}>25 mi</option>
+        <option value="50"  {% if _r == '50' %}selected{% endif %}>50 mi</option>
+        <option value="100" {% if _r == '100' %}selected{% endif %}>100 mi</option>
+        <option value="200" {% if _r == '200' %}selected{% endif %}>200 mi</option>
+        <option value="500" {% if _r == '500' %}selected{% endif %}>500 mi</option>
+      </select>
+    </span>
+  </label>
   <label>Max £ <input type="number" name="max_price" value="{{ filters.max_price or '' }}" style="width:80px"></label>
   <label><input type="checkbox" name="hide_sold_out" {% if filters.hide_sold_out %}checked{% endif %}> Hide sold out</label>
   <button type="button" id="clear-filters" class="btn-clear">Clear filters</button>

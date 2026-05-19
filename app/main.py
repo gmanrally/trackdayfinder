@@ -202,6 +202,38 @@ def _qs_no_sort(request: Request) -> str:
 INDEX_PAGE_DAYS = 30
 
 
+async def _resolve_postcode_filter(postcode: Optional[str], radius_mi: Optional[str]
+                                   ) -> tuple[Optional[tuple[float, float]], Optional[float]]:
+    """Return (origin_lat_lng, radius_miles) if both inputs are usable, else (None, None)."""
+    if not postcode or not radius_mi:
+        return None, None
+    try:
+        r = float(radius_mi)
+        if r <= 0:
+            return None, None
+    except (TypeError, ValueError):
+        return None, None
+    from .geo import postcode_to_latlng
+    origin = await postcode_to_latlng(postcode)
+    if origin is None:
+        return None, None
+    return origin, r
+
+
+def _within_radius(events, origin: tuple[float, float], radius_mi: float):
+    """Filter Event list to ones whose circuit's CIRCUIT_COORDS entry is within radius_mi."""
+    from .circuit_coords import CIRCUIT_COORDS
+    from .geo import haversine_miles
+    out = []
+    for e in events:
+        latlng = CIRCUIT_COORDS.get(e.circuit)
+        if not latlng:
+            continue  # unknown circuit → can't measure, drop
+        if haversine_miles(origin, latlng) <= radius_mi:
+            out.append(e)
+    return out
+
+
 def _multi(request: Request, name: str) -> list[str]:
     """Read repeated query params as a list, dropping empties.
     Supports both ?k=A&k=B and the legacy single-value ?k=A form."""
@@ -338,7 +370,9 @@ async def index(request: Request,
                 hide_sold_out: Optional[str] = None,
                 sort: Optional[str] = None,
                 from_offset: Optional[str] = None,
-                month: Optional[str] = None):
+                month: Optional[str] = None,
+                postcode: Optional[str] = None,
+                radius_mi: Optional[str] = None):
     weekdays = request.query_params.getlist("weekdays")
     circuits_sel = _multi(request, "circuit")
     sources_sel  = _multi(request, "source")
@@ -354,6 +388,9 @@ async def index(request: Request,
     win_start = today + timedelta(days=offset)
     win_end   = win_start + timedelta(days=INDEX_PAGE_DAYS)
 
+    origin, radius_value = await _resolve_postcode_filter(postcode, radius_mi)
+    geo_active = origin is not None
+
     with db_session() as s:
         q, sort_key = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                              from_, to, max_price, hide_sold_out, sort,
@@ -362,7 +399,7 @@ async def index(request: Request,
         # so they don't get a misleading "0 results" when matching events
         # exist further in the future.
         any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
-                          or vehicle or from_ or to or weekdays)
+                          or vehicle or from_ or to or weekdays or geo_active)
         if any_filter:
             windowed = q
             has_more = False
@@ -371,11 +408,16 @@ async def index(request: Request,
             beyond = s.exec(q.where(Event.event_date >= win_end).limit(1)).first()
             has_more = beyond is not None
         events = s.exec(windowed).all()
+        if geo_active:
+            events = _within_radius(events, origin, radius_value)
         # Total matching the user's filters (no pagination) — for the count pill.
-        from sqlmodel import func
-        total_count = s.exec(select(func.count()).select_from(q.subquery())).one()
-        if isinstance(total_count, tuple):
-            total_count = total_count[0]
+        if geo_active:
+            total_count = len(_within_radius(s.exec(q).all(), origin, radius_value))
+        else:
+            from sqlmodel import func
+            total_count = s.exec(select(func.count()).select_from(q.subquery())).one()
+            if isinstance(total_count, tuple):
+                total_count = total_count[0]
 
         all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
 
@@ -434,6 +476,7 @@ async def index(request: Request,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
             "weekdays": list(weekdays),
+            "postcode": postcode, "radius_mi": radius_mi,
         },
     })
 
@@ -450,7 +493,9 @@ async def index_chunk(request: Request,
                       hide_sold_out: Optional[str] = None,
                       sort: Optional[str] = None,
                       from_offset: Optional[str] = None,
-                      month: Optional[str] = None):
+                      month: Optional[str] = None,
+                      postcode: Optional[str] = None,
+                      radius_mi: Optional[str] = None):
     """Returns rendered <tr>s for the next 30-day window, plus a has_more flag.
     Used by the index page's infinite-scroll JS."""
     weekdays = request.query_params.getlist("weekdays")
@@ -466,12 +511,15 @@ async def index_chunk(request: Request,
     win_start = today + timedelta(days=offset)
     win_end   = win_start + timedelta(days=INDEX_PAGE_DAYS)
 
+    origin, radius_value = await _resolve_postcode_filter(postcode, radius_mi)
+    geo_active = origin is not None
+
     with db_session() as s:
         q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort,
                                       weekdays=weekdays, month=months_sel)
         any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
-                          or vehicle or from_ or to or weekdays)
+                          or vehicle or from_ or to or weekdays or geo_active)
         if any_filter:
             events = s.exec(q).all()
             has_more = False
@@ -480,6 +528,8 @@ async def index_chunk(request: Request,
                                     Event.event_date >= win_start)).all()
             beyond = s.exec(q.where(Event.event_date >= win_end).limit(1)).first()
             has_more = beyond is not None
+        if geo_active:
+            events = _within_radius(events, origin, radius_value)
 
     tmpl = templates.env.get_template("_event_row.html")
     html = "".join(tmpl.render(e=ev, request=request) for ev in events)
@@ -799,7 +849,9 @@ async def calendar_page(request: Request,
                         to: Optional[str] = None,
                         max_price: Optional[str] = None,
                         hide_sold_out: Optional[str] = None,
-                        month: Optional[str] = None):
+                        month: Optional[str] = None,
+                        postcode: Optional[str] = None,
+                        radius_mi: Optional[str] = None):
     """Month-grid calendar view of all upcoming events. Same filters as index."""
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
     weekdays = request.query_params.getlist("weekdays")
@@ -816,11 +868,14 @@ async def calendar_page(request: Request,
     elif from_:
         try: date.fromisoformat(from_); initial_iso = from_
         except ValueError: pass
+    origin, radius_value = await _resolve_postcode_filter(postcode, radius_mi)
     with db_session() as s:
         q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort=None,
                                       weekdays=weekdays, month=months_sel)
         events = s.exec(q).all()
+        if origin is not None:
+            events = _within_radius(events, origin, radius_value)
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
     # If no explicit date filter set but other filters narrow events, jump to
     # the earliest matching one so the user actually sees results immediately.
@@ -886,6 +941,7 @@ async def calendar_page(request: Request,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
             "weekdays": list(weekdays),
+            "postcode": postcode, "radius_mi": radius_mi,
         },
     })
 
@@ -900,7 +956,9 @@ async def map_page(request: Request,
                    to: Optional[str] = None,
                    max_price: Optional[str] = None,
                    hide_sold_out: Optional[str] = None,
-                   month: Optional[str] = None):
+                   month: Optional[str] = None,
+                   postcode: Optional[str] = None,
+                   radius_mi: Optional[str] = None):
     """Interactive map of UK + EU circuits with upcoming events.
     Honours the same filter set as the index calendar."""
     from collections import Counter
@@ -912,11 +970,14 @@ async def map_page(request: Request,
     sessions_sel = _multi(request, "session")
     months_sel   = _multi(request, "month")
     today = date.today()
+    origin, radius_value = await _resolve_postcode_filter(postcode, radius_mi)
     with db_session() as s:
         q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort=None,
                                       weekdays=weekdays, month=months_sel)
         events = s.exec(q).all()
+        if origin is not None:
+            events = _within_radius(events, origin, radius_value)
 
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
 
@@ -982,7 +1043,12 @@ async def map_page(request: Request,
     points = []                # circuits with upcoming matches — red numbered
     external_points = []       # active venues we don't scrape — red "?" marker
     inactive_points = []       # circuits we know but have no current events — grey
+    from .geo import haversine_miles
     for circuit_name, (lat, lng) in CIRCUIT_COORDS.items():
+        # Skip circuits outside the postcode radius (applies to all marker
+        # buckets — events, external "?" markers, and inactive greys).
+        if origin is not None and haversine_miles(origin, (lat, lng)) > radius_value:
+            continue
         n = counts.get(circuit_name, 0)
         marker = {
             "name": circuit_name,
@@ -1030,6 +1096,7 @@ async def map_page(request: Request,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
             "weekdays": list(weekdays),
+            "postcode": postcode, "radius_mi": radius_mi,
         },
     })
 
