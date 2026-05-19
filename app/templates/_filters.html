@@ -280,16 +280,29 @@
     var form = document.querySelector('form.filters');
     if (!form) return;
     var debounceTimer;
-    function submitNow() { form.submit(); }
+    // Defer to __applyFilters once it's defined further down — that helper
+    // builds the URL explicitly so it handles the reparented popovers too.
+    function submitNow() { (window.__applyFilters || form.submit.bind(form))(); }
     function submitDebounced() { clearTimeout(debounceTimer); debounceTimer = setTimeout(submitNow, 350); }
-    // Auto-submit on Vehicle (single select) and the Hide-sold-out checkbox.
-    // Popover checkboxes are inside .check-pop and submit only on Apply.
     form.querySelectorAll('select').forEach(function (el) { el.addEventListener('change', submitNow); });
     form.querySelectorAll('input[type=checkbox]').forEach(function (el) {
       if (el.closest('.check-pop')) return;
       el.addEventListener('change', submitNow);
     });
     form.querySelectorAll('input[type=number]').forEach(function (el) { el.addEventListener('input', submitDebounced); });
+    // Postcode is a text input — submit on blur/Enter (change) or after a
+    // 600 ms pause while typing. Empty value is fine; backend treats missing
+    // postcode/radius as "no geo filter".
+    form.querySelectorAll('input[name="postcode"]').forEach(function (el) {
+      el.addEventListener('change', submitNow);
+      el.addEventListener('input', function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(submitNow, 600);
+      });
+      el.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); submitNow(); }
+      });
+    });
     document.getElementById('clear-filters').addEventListener('click', function () { window.location = form.getAttribute('action') || '/'; });
 
     // Build a URL from the current state of all controls (form + reparented
