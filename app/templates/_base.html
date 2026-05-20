@@ -409,6 +409,11 @@
     tbody td.is-empty { display: none; }
   }
 </style>
+{# Umami analytics — self-hosted, GDPR-friendly. Loaded only when both
+   UMAMI_SRC + UMAMI_WEBSITE_ID env vars are set on the server. #}
+{% if umami_src and umami_website_id %}
+<script defer src="{{ umami_src }}" data-website-id="{{ umami_website_id }}"></script>
+{% endif %}
 </head>
 <body>
 

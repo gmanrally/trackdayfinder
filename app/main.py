@@ -21,6 +21,12 @@ CANONICAL_HOST = "https://trackdayfinder.co.uk"
 # Feature flags. Hidden from public unless explicitly enabled.
 ALERTS_ENABLED = os.environ.get("ALERTS_ENABLED", "").strip() == "1"
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()
+# Umami analytics (self-hosted). Both env vars must be set for the tracking
+# tag to render. UMAMI_SRC is the script URL exposed by your Umami install
+# (e.g. https://analytics.trackdayfinder.co.uk/script.js); UMAMI_WEBSITE_ID
+# is the per-site UUID from Umami's settings.
+UMAMI_SRC = os.environ.get("UMAMI_SRC", "").strip()
+UMAMI_WEBSITE_ID = os.environ.get("UMAMI_WEBSITE_ID", "").strip()
 
 
 def slugify(s: str) -> str:
@@ -48,6 +54,8 @@ def _global_meta() -> dict:
 
 templates.env.globals["global_meta"] = _global_meta
 templates.env.globals["alerts_enabled"] = ALERTS_ENABLED
+templates.env.globals["umami_src"] = UMAMI_SRC
+templates.env.globals["umami_website_id"] = UMAMI_WEBSITE_ID
 
 
 def _breadcrumbs(path: str) -> list[dict]:

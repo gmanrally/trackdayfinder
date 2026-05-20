@@ -1,0 +1,42 @@
+# Self-hosted Umami analytics, sat alongside the trackdayfinder app.
+# Place this file at /opt/trackdayfinder-analytics/docker-compose.yml on
+# the VPS and `docker compose up -d` from that directory.
+#
+# Then in your trackdayfinder docker-compose.yml, add:
+#     environment:
+#       - UMAMI_SRC=https://analytics.trackdayfinder.co.uk/script.js
+#       - UMAMI_WEBSITE_ID=<paste the website UUID from Umami's settings>
+#
+# Default Umami login: admin / umami  (CHANGE IT IMMEDIATELY on first sign-in)
+
+services:
+  umami-db:
+    image: postgres:15-alpine
+    container_name: umami-db
+    restart: always
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      # Replace this before deploying — it never has to leave the VPS but
+      # shouldn't be a weak value.
+      POSTGRES_PASSWORD: CHANGE_ME_TO_A_LONG_RANDOM_PASSWORD
+    volumes:
+      - umami-db-data:/var/lib/postgresql/data
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: umami
+    restart: always
+    depends_on:
+      - umami-db
+    environment:
+      DATABASE_URL: postgresql://umami:CHANGE_ME_TO_A_LONG_RANDOM_PASSWORD@umami-db:5432/umami
+      DATABASE_TYPE: postgresql
+      # 32+ char random secret used for session tokens. openssl rand -hex 32
+      APP_SECRET: CHANGE_ME_TO_A_LONG_RANDOM_HEX_SECRET
+    ports:
+      - "127.0.0.1:3210:3000"
+    # Bound to 127.0.0.1 so it's only reachable via the nginx vhost below.
+
+volumes:
+  umami-db-data:
