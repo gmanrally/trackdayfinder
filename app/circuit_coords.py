@@ -32,6 +32,7 @@ CIRCUIT_COORDS: dict[str, tuple[float, float]] = {
     "Cadwell Park":         (53.3115, -0.0517),
     "Castle Combe":         (51.4925, -2.2150),
     "Anglesey":             (53.1937, -4.5095),
+    "Three Sisters":        (53.5128, -2.6125),
     "Bedford Autodrome":    (52.2244, -0.4651),
     "Thruxton":             (51.2122, -1.6028),
     "Croft":                (54.4564, -1.5589),
