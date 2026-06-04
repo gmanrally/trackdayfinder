@@ -5,7 +5,7 @@ from . import (
     rsr_nurburg, gedlich, trackdays_events,
     pembrey, llandow, kirkistown,
     trackday_solutions, curbstone, lotus_on_track, df_trackdays, skylimit, europa,
-    three_sisters,
+    three_sisters, castle_combe,
 )
 
 SCRAPERS = {
@@ -35,6 +35,7 @@ SCRAPERS = {
     "skylimit": skylimit,
     "europa": europa,
     "three_sisters": three_sisters,
+    "castle_combe": castle_combe,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -66,6 +67,7 @@ ORGANISER_DISPLAY = {
     "skylimit": "Skylimit Events",
     "europa": "Europa Trackdays (aggregator)",
     "three_sisters": "Three Sisters Circuit",
+    "castle_combe": "Castle Combe Circuit",
 }
 
 # Region grouping for the dropdown (UK first, EU after).
@@ -87,5 +89,6 @@ SOURCE_REGION = {
     "skylimit": "EU",
     "europa": "EU",
     "three_sisters": "UK",
+    "castle_combe": "UK",
     "kirkistown": "UK",
 }
