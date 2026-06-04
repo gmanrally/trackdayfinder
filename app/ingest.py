@@ -1,12 +1,37 @@
 """Run scrapers and upsert results into the DB."""
 from __future__ import annotations
 import asyncio
-from datetime import datetime
-from sqlmodel import select
+from datetime import datetime, timedelta, date as _date
+from sqlmodel import select, delete as sql_delete
 from .models import Event, ScrapeRun, EventSnapshot, init_db, session
 from .normalise import canonical_circuit, parse_price, parse_noise, make_dedup_key, to_gbp
 from .scrapers import SCRAPERS
 from .circuit_noise import CIRCUIT_STATIC_NOISE_DB
+
+# Stale-event guardrails. After a successful per-source scrape we delete
+# upcoming events from that source whose last_seen is older than this many
+# days. Skipped entirely when the scrape returned fewer than MIN_EVENTS_TO_PRUNE
+# events — a transient outage shouldn't wipe everything.
+STALE_PRUNE_DAYS = 14
+MIN_EVENTS_TO_PRUNE = 3
+
+
+def _prune_stale(source: str) -> int:
+    """Delete upcoming events from `source` whose last_seen is older than
+    STALE_PRUNE_DAYS. Returns number deleted. Safe to call repeatedly."""
+    cutoff = datetime.utcnow() - timedelta(days=STALE_PRUNE_DAYS)
+    today = _date.today()
+    with session() as s:
+        stmt = sql_delete(Event).where(
+            Event.source == source,
+            Event.event_date >= today,
+            Event.last_seen.is_not(None),
+            Event.last_seen < cutoff,
+        )
+        result = s.exec(stmt)
+        n = result.rowcount or 0
+        s.commit()
+    return n
 
 
 def _infer_session(session: str | None, title: str | None, notes: str | None) -> str | None:
@@ -93,6 +118,12 @@ async def run_one(slug: str) -> tuple[int, str | None]:
                 n += 1
             s.commit()
         run.ok = True
+        # Prune stale upcoming events for this source — anything that was
+        # in the DB but didn't appear in the last N days of scrapes is
+        # probably a ghost (organiser removed it from their listing) and
+        # should drop from our display.
+        if n >= MIN_EVENTS_TO_PRUNE:
+            _prune_stale(event_source)
     except Exception as e:
         err = f"{type(e).__name__}: {e}"
         run.error = err
