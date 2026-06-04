@@ -1027,11 +1027,12 @@ async def map_page(request: Request,
         if "region-eu" in sources_sel and EXTERNAL_REGION.get(name) != "EU": return False
         # Specific circuits picked → only those circuits' external markers.
         if circuits_sel and name not in circuits_sel: return False
-        # Date / month / weekday filters set → we don't know external dates;
-        # hide rather than mislead.
+        # Date / month / weekday / vehicle filters set → we don't know
+        # external dates or which vehicle types they cover; hide rather
+        # than mislead.
         if from_ or to or months_sel: return False
         if weekdays: return False
-        # Vehicle: external venues run mixed; pass.
+        if vehicle: return False
         return True
     counts = Counter(e.circuit for e in events)
     next_dates: dict[str, str] = {}
@@ -1082,7 +1083,7 @@ async def map_page(request: Request,
                 continue
             if circuits_sel and circuit_name not in circuits_sel:
                 continue
-            if from_ or to or months_sel or weekdays:
+            if from_ or to or months_sel or weekdays or vehicle:
                 continue
             inactive_points.append(marker)
 
