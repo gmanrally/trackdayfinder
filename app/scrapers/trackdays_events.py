@@ -50,6 +50,44 @@ INDEX_PATH_RE = re.compile(
     re.I,
 )
 
+# Organisers we already scrape directly. trackdays.events sometimes lists
+# speculative or stale dates under these names — but our direct scraper is
+# canonical, so we drop the aggregator's row outright whenever its organiser
+# name matches one of these (token overlap on ≥1 meaningful word).
+KNOWN_DIRECT_ORGANISERS: list[set[str]] = [
+    {"curbstone"},
+    {"lotus"},                       # "Lotus on Track"
+    {"df", "trackdays"}, {"dftrackdays"},
+    {"skylimit"},
+    {"msv"},                         # "MSV Trackdays" / "MSVT"
+    {"javelin"},
+    {"opentrack"},
+    {"silverstone"},
+    {"rma"},
+    {"nolimits"}, {"no", "limits"},
+    {"goldtrack"}, {"gold", "track"},
+    {"goodwood"},
+    {"slipandgrip"}, {"slip", "grip"},
+    {"trackobsession"}, {"track", "obsession"},
+    {"rsr"},                         # "RSR Nürburg" / "RSR Spa"
+    {"gedlich"},
+    {"pembrey"},
+    {"llandow"},
+    {"kirkistown"},
+    {"three", "sisters"},
+    {"castle", "combe"},
+    {"motorsport", "events"},        # MSEvents
+]
+
+
+def _matches_known_direct(organiser_tokens: set[str]) -> bool:
+    """True if the organiser's tokens contain any known-direct organiser
+    fingerprint (all tokens of the fingerprint must be present)."""
+    for fp in KNOWN_DIRECT_ORGANISERS:
+        if fp.issubset(organiser_tokens):
+            return True
+    return False
+
 
 def _norm_tokens(s: str) -> set[str]:
     s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
@@ -164,6 +202,13 @@ def _parse_row(tr: Node, year: int, month: int, covered: dict) -> Optional[RawEv
         break
     if booking_url is None:
         return None  # drop rows that would dump the user on a homepage
+
+    # If the organiser is one we already scrape directly, drop the row.
+    # Our direct scraper is canonical; trackdays.events sometimes lists
+    # speculative dates under these names that don't match the real site.
+    org_tokens = _norm_tokens(organiser_text) - _STOP
+    if _matches_known_direct(org_tokens):
+        return None
 
     # Dedup against direct scrapers — this is a gap-filler only.
     if _is_duplicate(circuit_raw, organiser_text, event_date, covered):
