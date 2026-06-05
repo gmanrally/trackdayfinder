@@ -20,6 +20,7 @@ inspected.
 from __future__ import annotations
 import argparse
 import asyncio
+import os
 import random
 import re
 import sys
@@ -177,14 +178,25 @@ async def main_async(args) -> int:
 
 
 def main() -> int:
+    # Env-var fallbacks so the stdin-pipe invocation (which can't pass argv)
+    # can still tune behaviour:
+    #   TDF_AUDIT_PER_SOURCE=0  → audit every event in every source (default)
+    #   TDF_AUDIT_PER_SOURCE=40 → sample 40 per source
+    #   TDF_AUDIT_SOURCE=msv    → restrict to one source
+    #   TDF_AUDIT_CONCURRENCY=20
     p = argparse.ArgumentParser()
-    p.add_argument("--per-source", type=int, default=40)
-    p.add_argument("--source", default=None)
-    p.add_argument("--concurrency", type=int, default=10)
-    p.add_argument("--timeout", type=float, default=12.0)
+    p.add_argument("--per-source", type=int,
+                   default=int(os.environ.get("TDF_AUDIT_PER_SOURCE", "0")))
+    p.add_argument("--source",
+                   default=os.environ.get("TDF_AUDIT_SOURCE") or None)
+    p.add_argument("--concurrency", type=int,
+                   default=int(os.environ.get("TDF_AUDIT_CONCURRENCY", "16")))
+    p.add_argument("--timeout", type=float, default=10.0)
     p.add_argument("--strict", action="store_true")
     p.add_argument("--seed", type=int, default=1)
     args = p.parse_args()
+    if args.per_source <= 0:
+        args.per_source = 10 ** 9  # effectively unbounded
     return asyncio.run(main_async(args))
 
 
