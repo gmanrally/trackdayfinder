@@ -34,6 +34,27 @@ def _prune_stale(source: str) -> int:
     return n
 
 
+def _delta_prune(source: str, run_start: datetime) -> int:
+    """Delete upcoming events from `source` that weren't touched in the
+    current scrape run. This is the right behaviour for aggregator sources
+    where the live listing is the source of truth — anything the scraper
+    didn't re-emit this run has been removed upstream and should drop from
+    our display. `run_start` is captured before the per-row upsert loop so
+    every row touched this run has last_seen >= run_start."""
+    today = _date.today()
+    with session() as s:
+        stmt = sql_delete(Event).where(
+            Event.source == source,
+            Event.event_date >= today,
+            Event.last_seen.is_not(None),
+            Event.last_seen < run_start,
+        )
+        result = s.exec(stmt)
+        n = result.rowcount or 0
+        s.commit()
+    return n
+
+
 def _infer_session(session: str | None, title: str | None, notes: str | None) -> str | None:
     """If the scraper said 'day' (or nothing) but the title/notes suggest
     a partial-day session, refine it. Trust an explicit non-'day' value."""
@@ -60,6 +81,14 @@ async def run_one(slug: str) -> tuple[int, str | None]:
     n = 0
     err: str | None = None
     try:
+        # Capture run_start BEFORE the upsert loop so every row touched
+        # this run gets last_seen >= run_start. Anything in the DB from
+        # this source with last_seen < run_start is what the source no
+        # longer lists and gets delta-pruned at the end. We track every
+        # distinct event_source we emit rows for so virtual sources (e.g.
+        # nurburgring_tf split out from rsr_nurburg) get pruned too.
+        run_start = datetime.utcnow()
+        emitted_sources: set[str] = set()
         raws = await module.fetch()
         with session() as s:
             for raw in raws:
@@ -72,6 +101,7 @@ async def run_one(slug: str) -> tuple[int, str | None]:
                 # Honour raw.source if a scraper splits its output into multiple
                 # logical sources (e.g. RSR pulls out Touristenfahrten as "nurburgring_tf").
                 event_source = raw.source or slug
+                emitted_sources.add(event_source)
                 key = make_dedup_key(event_source, circuit, raw.event_date, raw.organiser,
                                      external_id=raw.external_id, session=raw.session)
                 existing = s.exec(select(Event).where(Event.dedup_key == key)).first()
@@ -123,12 +153,16 @@ async def run_one(slug: str) -> tuple[int, str | None]:
                 n += 1
             s.commit()
         run.ok = True
-        # Prune stale upcoming events for this source — anything that was
-        # in the DB but didn't appear in the last N days of scrapes is
-        # probably a ghost (organiser removed it from their listing) and
-        # should drop from our display.
+        # Delta-prune: anything we didn't re-emit this run (last_seen older
+        # than this run's start time) has been removed from the source and
+        # should drop from our display. Guarded by MIN_EVENTS_TO_PRUNE so a
+        # partial scrape doesn't wipe legit rows. Walks every distinct
+        # source we emitted to handle virtual sources (rsr_nurburg →
+        # nurburgring_tf). Also keep _prune_stale as a 14-day backstop.
         if n >= MIN_EVENTS_TO_PRUNE:
-            _prune_stale(event_source)
+            for ev_src in (emitted_sources or {slug}):
+                _delta_prune(ev_src, run_start)
+                _prune_stale(ev_src)
     except Exception as e:
         err = f"{type(e).__name__}: {e}"
         run.error = err
