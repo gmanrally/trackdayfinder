@@ -39,16 +39,11 @@ MONTHS = {m: i for i, m in enumerate(
     ["January", "February", "March", "April", "May", "June",
      "July", "August", "September", "October", "November", "December"], start=1)}
 
-# URL paths that are unhelpful as a booking destination — they leave the user
-# on a generic listing page rather than the actual event. Skip any row whose
-# only link looks like one of these.
+# URLs that point at a bare hostname are too generic to be a useful "Book"
+# destination — the user lands on the site root and has no idea which date
+# is theirs. Rows like that use the trackdays.events listing as a fallback
+# so at least the Book button takes them to a calendar with the row visible.
 HOMEPAGE_RE = re.compile(r"^https?://[^/]+/?$", re.I)
-INDEX_PATH_RE = re.compile(
-    r"^https?://[^/]+/(?:[a-z]{2,3}/)?"
-    r"(?:events?|trackdays?|calend(?:rier|ar)|agenda|termine|fechas|rennen|"
-    r"shop/?$|home|kontakt|news|page|index)/?(?:\?.*)?$",
-    re.I,
-)
 
 # Organisers we already scrape directly. trackdays.events sometimes lists
 # speculative or stale dates under these names — but our direct scraper is
@@ -115,14 +110,9 @@ def _build_covered_index():
     return covered
 
 
-def _is_useless_url(url: str) -> bool:
-    if not url or not url.startswith("http"):
-        return True
-    if HOMEPAGE_RE.match(url):
-        return True
-    if INDEX_PATH_RE.match(url):
-        return True
-    return False
+def _is_bare_homepage(url: str) -> bool:
+    """True if the URL is a bare hostname with no useful path."""
+    return bool(url) and bool(HOMEPAGE_RE.match(url))
 
 
 def _is_duplicate(circuit: str, organiser: str, event_date: date,
@@ -200,19 +190,27 @@ def _parse_row(tr: Node, month_year: dict[int, int], covered: dict) -> Optional[
     if note in ("-", ""):
         note = None
 
-    # Booking link must look event-specific. We accept any external <a>
-    # whose URL has a real path (and isn't a generic listing index).
+    # Pick the most useful external link in the row. Anything with a real
+    # path is preferred; if the only available link is a bare hostname we
+    # fall back to the trackdays.events listing URL so the Book button
+    # lands on the aggregator's calendar (where the row is visible) instead
+    # of dumping the user on a generic site root.
     booking_url: Optional[str] = None
+    homepage_fallback_seen = False
     for a in tr.css("a"):
         href = a.attributes.get("href", "")
         if not href.startswith("http"):
             continue
-        if _is_useless_url(href):
+        if _is_bare_homepage(href):
+            homepage_fallback_seen = True
             continue
         booking_url = href
         break
     if booking_url is None:
-        return None  # drop rows that would dump the user on a homepage
+        if homepage_fallback_seen:
+            booking_url = LISTING_URL
+        else:
+            return None  # no link at all — can't surface this row usefully
 
     # If the organiser is one we already scrape directly, drop the row.
     # Our direct scraper is canonical; trackdays.events sometimes lists
