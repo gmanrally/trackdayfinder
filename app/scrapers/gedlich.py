@@ -24,6 +24,18 @@ DEBUG_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "debug"
 
 DATE_RE = re.compile(r"(\d{2})\.(\d{2})\.(\d{4})")
 SLOTS_RE = re.compile(r"(\d+)\s+free\s+slot", re.I)
+# Slug encodes the event date too. We use it as the source of truth for the
+# year — Gedlich sometimes updates the visible '.dates' text but leaves the
+# URL on an older year, so the booking link 404s if we trust the text.
+SLUG_DATE_RE = re.compile(
+    r"/(?:termin|event)/(\d{1,2})(?:-\d{1,2})?-([a-z]{3,4})-(\d{4})",
+    re.I,
+)
+SLUG_MONTHS = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "mai": 5,
+    "jun": 6, "juni": 6, "jul": 7, "juli": 7, "aug": 8, "sep": 9,
+    "sept": 9, "oct": 10, "okt": 10, "nov": 11, "dec": 12, "dez": 12,
+}
 
 
 async def fetch() -> list[RawEvent]:
@@ -50,7 +62,6 @@ def _parse(card: Node) -> Optional[RawEvent]:
     date_node = card.css_first(".dates")
     if not date_node:
         return None
-    # First date in the .dates text — multi-day events use the start date.
     date_text = date_node.text(strip=True)
     m = DATE_RE.search(date_text)
     if not m:
@@ -59,6 +70,19 @@ def _parse(card: Node) -> Optional[RawEvent]:
         event_date = datetime.strptime(f"{m.group(1)}.{m.group(2)}.{m.group(3)}", "%d.%m.%Y").date()
     except ValueError:
         return None
+
+    # If the URL slug carries a different year than the displayed text,
+    # trust the URL — Gedlich sometimes refreshes the text but leaves the
+    # slug on an older year, so the booking link 404s if we trust the text.
+    slug_m = SLUG_DATE_RE.search(href)
+    if slug_m:
+        slug_year = int(slug_m.group(3))
+        slug_month = SLUG_MONTHS.get(slug_m.group(2).lower())
+        if slug_month and (slug_year, slug_month) != (event_date.year, event_date.month):
+            try:
+                event_date = event_date.replace(year=slug_year, month=slug_month)
+            except ValueError:
+                pass
 
     booking_node = card.css_first(".booking")
     booking_text = (booking_node.text(strip=True) if booking_node else "").lower()

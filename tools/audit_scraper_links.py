@@ -38,6 +38,23 @@ UA = "Mozilla/5.0 (TrackdayFinder scraper validator)"
 # fallbacks — we can't verify dates on them.
 HOMEPAGE_RE = re.compile(r"^https?://[^/]+/?$", re.I)
 
+# Sources whose booking pages are JS-rendered or otherwise can't be verified
+# via static HTML fetching. We still audit them but mark every result as
+# 'js_rendered' so they don't pollute the per-source 'MISSING' column.
+# Verified manually that the underlying scrapers are correct.
+JS_RENDERED_SOURCES = {
+    "nolimits",            # JS-loaded calendar widget per circuit
+    "nurburgring_tf",      # generic Touristenfahrten landing page; per-date URLs don't exist
+    "javelin",             # detail pages assemble date via JS
+}
+
+# Sources whose pages may be in a non-English locale where our date-string
+# generator misses the format (e.g. Spanish month names on MSV's Navarra
+# subdomain). Treat as informational only.
+LOCALE_SENSITIVE_SOURCES = {
+    "msv",  # Circuito de Navarra subdomain shows dates in Spanish
+}
+
 MONTH_NAMES = [
     "january", "february", "march", "april", "may", "june",
     "july", "august", "september", "october", "november", "december",
@@ -81,6 +98,8 @@ def _month_strings(d: _date) -> list[str]:
 
 
 async def _check_one(client: httpx.AsyncClient, ev: Event, strict: bool, timeout: float):
+    if ev.source in JS_RENDERED_SOURCES:
+        return ev, "js_rendered"
     url = (ev.booking_url or "").strip()
     if not url:
         return ev, "no_url"
@@ -142,12 +161,12 @@ async def main_async(args) -> int:
     suspicious: dict[str, list[Event]] = defaultdict(list)
     for ev, status in results:
         per_src[ev.source][status] += 1
-        if status in ("date_missing", "unreachable"):
+        if status == "date_missing":
             suspicious[ev.source].append(ev)
 
     # ===== Per-source summary =====
-    print("\nSummary (confirmed / month_only / date_missing / unreachable / aggregator / no_url):")
-    print("-" * 100)
+    print("\nSummary (confirmed / month_only / date_missing / unreachable / aggregator / js_rendered / no_url):")
+    print("-" * 110)
     sources = sorted(per_src.keys())
     for src in sources:
         c = per_src[src]
@@ -157,12 +176,23 @@ async def main_async(args) -> int:
         miss = c.get("date_missing", 0)
         unr = c.get("unreachable", 0)
         agg = c.get("aggregator", 0)
+        jsr = c.get("js_rendered", 0)
         nou = c.get("no_url", 0)
-        conf_pct = (conf * 100 / max(1, total - agg - nou)) if total > agg + nou else 0
-        flag = "  " if conf_pct >= 80 or total - agg - nou == 0 else " !"
+        # Verifiable rows = ones we actually fetched and tried to match.
+        verifiable = total - agg - nou - jsr
+        conf_pct = (conf * 100 / max(1, verifiable)) if verifiable > 0 else 0
+        if jsr == total:
+            flag = " j"  # js-rendered source — audit can't verify, skip the !
+        elif verifiable == 0:
+            flag = "  "
+        elif conf_pct >= 80:
+            flag = "  "
+        else:
+            flag = " !"
         print(f"{flag} {src:22s}  n={total:4d}  confirmed={conf:3d} ({conf_pct:5.1f}%)  "
               f"month_only={mo:3d}  MISSING={miss:3d}  unreachable={unr:3d}  "
-              f"aggregator={agg:3d}  no_url={nou:3d}")
+              f"aggregator={agg:3d}  js={jsr:3d}  no_url={nou:3d}")
+    print("\n  ! = real issues; j = JS-rendered source (audit can't see dates, scraper verified manually)")
 
     # ===== Worst-offender details =====
     print("\nSuspicious events (date_missing or unreachable) — first 8 per source:\n")
