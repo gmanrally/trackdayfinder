@@ -143,28 +143,29 @@ async def fetch() -> list[RawEvent]:
     tree = await get_html_js(LISTING_URL, wait_selector=".mydate")
     (DEBUG_DIR / "trackdays_events.html").write_text(tree.html or "", encoding="utf-8", errors="ignore")
 
+    # The page actually lays out as: all <h2>Month YYYY</h2> first, then all
+    # <table class="events"> after. Walking in document order and tracking
+    # the last-seen h2 puts every row under the FINAL month (December).
+    # Build a {month -> year} lookup up front and trust each row's own date
+    # cell for which month to use.
+    month_year: dict[int, int] = {}
+    for h in tree.css("h2"):
+        m = MONTH_HEADER_RE.search(h.text(strip=True))
+        if m and m.group(1) in MONTHS:
+            month_year[MONTHS[m.group(1)]] = int(m.group(2))
+
     covered = _build_covered_index()
     out: list[RawEvent] = []
     today = date.today()
-    current_month: Optional[int] = None
-    current_year: Optional[int] = None
-    for node in tree.css("h2, table.events"):
-        if node.tag == "h2":
-            m = MONTH_HEADER_RE.search(node.text(strip=True))
-            if m and m.group(1) in MONTHS:
-                current_month = MONTHS[m.group(1)]
-                current_year = int(m.group(2))
-            continue
-        if current_month is None or current_year is None:
-            continue
-        for tr in node.css("tbody tr"):
-            ev = _parse_row(tr, current_year, current_month, covered)
+    for table in tree.css("table.events"):
+        for tr in table.css("tbody tr"):
+            ev = _parse_row(tr, month_year, covered)
             if ev and ev.event_date >= today:
                 out.append(ev)
     return out
 
 
-def _parse_row(tr: Node, year: int, month: int, covered: dict) -> Optional[RawEvent]:
+def _parse_row(tr: Node, month_year: dict[int, int], covered: dict) -> Optional[RawEvent]:
     cells = tr.css("td")
     if len(cells) < 5:
         return None
@@ -173,8 +174,18 @@ def _parse_row(tr: Node, year: int, month: int, covered: dict) -> Optional[RawEv
     dm = DATE_RE.search(date_text)
     if not dm:
         return None
+    # DATE_RE: (day, month-name). Trust the month name from the cell, look
+    # the year up via the page-level {month -> year} map.
+    day_num = int(dm.group(1))
+    month_name = dm.group(2)
+    month = MONTHS.get(month_name)
+    if month is None:
+        return None
+    year = month_year.get(month)
+    if year is None:
+        return None  # no h2 for this month — page layout drifted; bail
     try:
-        event_date = date(year, month, int(dm.group(1)))
+        event_date = date(year, month, day_num)
     except ValueError:
         return None
 
