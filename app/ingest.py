@@ -63,6 +63,11 @@ async def run_one(slug: str) -> tuple[int, str | None]:
         raws = await module.fetch()
         with session() as s:
             for raw in raws:
+                # No legitimate trackday runs on Christmas Day. Aggregator
+                # sources (notably trackdays.events) sometimes carry
+                # speculative or test rows that land on 25 Dec — block them.
+                if raw.event_date.month == 12 and raw.event_date.day == 25:
+                    continue
                 circuit = canonical_circuit(raw.circuit_raw)
                 # Honour raw.source if a scraper splits its output into multiple
                 # logical sources (e.g. RSR pulls out Touristenfahrten as "nurburgring_tf").
