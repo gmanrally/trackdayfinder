@@ -228,12 +228,24 @@ async def _resolve_postcode_filter(postcode: Optional[str], radius_mi: Optional[
     return origin, r
 
 
-def _within_countries(events, countries: list[str]):
-    """Filter events to ones whose circuit is in one of the named countries.
-    Circuits with no country mapping are dropped when a country filter is on."""
+def _country_for_event(e) -> Optional[str]:
+    """Best-guess country for an event. Uses the explicit circuit→country map
+    first; if that's missing, falls back to 'United Kingdom' for UK-region
+    events. EU-region events with no explicit tag stay untagged — we don't
+    have enough info to pick a specific country from the region alone."""
     from .circuit_countries import CIRCUIT_COUNTRY
+    c = CIRCUIT_COUNTRY.get(e.circuit)
+    if c:
+        return c
+    if (e.region or "").upper() == "UK":
+        return "United Kingdom"
+    return None
+
+
+def _within_countries(events, countries: list[str]):
+    """Filter events to ones whose country is in `countries`."""
     wanted = set(countries)
-    return [e for e in events if CIRCUIT_COUNTRY.get(e.circuit) in wanted]
+    return [e for e in events if _country_for_event(e) in wanted]
 
 
 def _within_radius(events, origin: tuple[float, float], radius_mi: float):
@@ -462,7 +474,7 @@ async def index(request: Request,
                     elif s_ == "region-eu": hits.append(e.region == "EU")
                     else: hits.append(e.source == s_)
                 if not any(hits): return False
-            if countries_sel and CIRCUIT_COUNTRY.get(e.circuit) not in countries_sel:
+            if countries_sel and _country_for_event(e) not in countries_sel:
                 return False
             return True
         circuits = sorted({e.circuit for e in all_events if _matches_other_filters(e)})
@@ -476,7 +488,7 @@ async def index(request: Request,
             if vehicle and e.vehicle_type != vehicle: continue
             if sessions_sel and e.session not in sessions_sel: continue
             if circuits_sel and e.circuit not in circuits_sel: continue
-            c = CIRCUIT_COUNTRY.get(e.circuit)
+            c = _country_for_event(e)
             if c: country_counts[c] += 1
         countries_list = [(c, n) for c, n in country_counts.most_common()]
 
@@ -962,7 +974,7 @@ async def calendar_page(request: Request,
                 elif s_ == "region-eu": hits.append(e.region == "EU")
                 else: hits.append(e.source == s_)
             if not any(hits): return False
-        if countries_sel and CIRCUIT_COUNTRY.get(e.circuit) not in countries_sel:
+        if countries_sel and _country_for_event(e) not in countries_sel:
             return False
         return True
     circuits = sorted({e.circuit for e in all_events_today if _matches_other_filters(e)})
@@ -979,7 +991,7 @@ async def calendar_page(request: Request,
     from collections import Counter
     country_counts = Counter()
     for e in all_events_today:
-        c = CIRCUIT_COUNTRY.get(e.circuit)
+        c = _country_for_event(e)
         if c: country_counts[c] += 1
     countries_list = country_counts.most_common()
 
@@ -1057,7 +1069,7 @@ async def map_page(request: Request,
                 elif s_ == "region-eu": hits.append(e.region == "EU")
                 else: hits.append(e.source == s_)
             if not any(hits): return False
-        if countries_sel and CIRCUIT_COUNTRY.get(e.circuit) not in countries_sel:
+        if countries_sel and _country_for_event(e) not in countries_sel:
             return False
         return True
     circuits = sorted({e.circuit for e in all_events_today if _matches_other_filters(e)})
@@ -1073,7 +1085,7 @@ async def map_page(request: Request,
     months = _build_month_choices(all_events_today)
     country_counts: Counter = Counter()
     for e in all_events_today:
-        c_ = CIRCUIT_COUNTRY.get(e.circuit)
+        c_ = _country_for_event(e)
         if c_: country_counts[c_] += 1
     countries_list = country_counts.most_common()
 

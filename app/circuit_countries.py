@@ -33,6 +33,7 @@ CIRCUIT_COUNTRY: dict[str, str] = {
     "Abingdon":                     "United Kingdom",
     "Kirkistown":                   "United Kingdom",
     "Bishopscourt":                 "United Kingdom",
+    "Hethel":                       "United Kingdom",
 
     # ===== Ireland =====
     "Mondello Park":                "Ireland",
@@ -58,6 +59,7 @@ CIRCUIT_COUNTRY: dict[str, str] = {
     "Schleizer Dreieck":            "Germany",
     "Meppen Racepark":              "Germany",
     "Race Park Meppen":             "Germany",
+    "Meppen Circuit":               "Germany",
     "Porsche Ring":                 "Germany",
     "Boxberg":                      "Germany",
     "Gross Dölln":                  "Germany",
@@ -68,6 +70,28 @@ CIRCUIT_COUNTRY: dict[str, str] = {
 
     # ===== France =====
     "Magny-Cours":                  "France",
+    "Castellet":                    "France",
+    "Bourbonnais":                  "France",
+    "Torcy (Vaison Piste)":         "France",
+    "La Châtre":                    "France",
+    "La Ferté Gaucher":             "France",
+    "Circuits de Vendée":           "France",
+    "Lohéac":                       "France",
+    "Folembray":                    "France",
+    "Le Laquais":                   "France",
+    "Le Luc":                       "France",
+    "Abbeville":                    "France",
+    "Val de Vienne":                "France",
+    "Haute Saintonge":              "France",
+    "Géoparc St-Dié":               "France",
+    "Roussillon (Rivesaltes)":      "France",
+    "Montpellier":                  "France",
+    "Mornay":                       "France",
+    "Trappes":                      "France",
+    "Grand Sambuc":                 "France",
+    "Albi":                         "France",
+    "Ouest parisien":               "France",
+    "Ceram-Mortefontaine":          "France",
     "Le Mans (Bugatti)":            "France",
     "Circuit Bugatti (Le Mans)":    "France",
     "Paul Ricard":                  "France",
@@ -132,6 +156,10 @@ CIRCUIT_COUNTRY: dict[str, str] = {
     "Monteblanco":                  "Spain",
     "Almeria (Iberia Circuit)":     "Spain",
     "Guadix (Granada)":             "Spain",
+    "Almeria":                      "Spain",
+    "Andalucia":                    "Spain",
+    "MotorLand Aragón":             "Spain",
+    "Castelloli":                   "Spain",
 
     # ===== Czech Republic =====
     "Most":                         "Czech Republic",
@@ -147,6 +175,7 @@ CIRCUIT_COUNTRY: dict[str, str] = {
     # ===== Hungary =====
     "Hungaroring":                  "Hungary",
     "Pannonia Ring":                "Hungary",
+    "Pannonia-Ring":                "Hungary",
     "Balaton Park Circuit":         "Hungary",
 
     # ===== Austria =====
