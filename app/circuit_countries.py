@@ -1,0 +1,161 @@
+"""Country tagging for every circuit. Used by the Country filter and any
+other place that needs to group events geographically.
+
+Anything not listed defaults to None — the country filter then excludes
+the circuit if any country is selected. Update this alongside CIRCUIT_COORDS
+when adding new venues.
+"""
+
+CIRCUIT_COUNTRY: dict[str, str] = {
+    # ===== United Kingdom =====
+    "Silverstone":                  "United Kingdom",
+    "Donington Park":               "United Kingdom",
+    "Brands Hatch":                 "United Kingdom",
+    "Snetterton":                   "United Kingdom",
+    "Oulton Park":                  "United Kingdom",
+    "Cadwell Park":                 "United Kingdom",
+    "Castle Combe":                 "United Kingdom",
+    "Anglesey":                     "United Kingdom",
+    "Three Sisters":                "United Kingdom",
+    "Bedford Autodrome":            "United Kingdom",
+    "Thruxton":                     "United Kingdom",
+    "Croft":                        "United Kingdom",
+    "Knockhill":                    "United Kingdom",
+    "Pembrey":                      "United Kingdom",
+    "Blyton Park":                  "United Kingdom",
+    "Rockingham":                   "United Kingdom",
+    "Mallory Park":                 "United Kingdom",
+    "Lydden Hill":                  "United Kingdom",
+    "Goodwood":                     "United Kingdom",
+    "Llandow":                      "United Kingdom",
+    "Curborough":                   "United Kingdom",
+    "Keevil":                       "United Kingdom",
+    "Abingdon":                     "United Kingdom",
+    "Kirkistown":                   "United Kingdom",
+    "Bishopscourt":                 "United Kingdom",
+
+    # ===== Ireland =====
+    "Mondello Park":                "Ireland",
+
+    # ===== Belgium =====
+    "Spa-Francorchamps":            "Belgium",
+    "Zolder":                       "Belgium",
+    "Mettet":                       "Belgium",
+    "Circuit Jules Tacheny Mettet": "Belgium",
+
+    # ===== Germany =====
+    "Nürburgring":                  "Germany",
+    "Nürburgring (Grand Prix)":     "Germany",
+    "Nürburgring (Nordschleife)":   "Germany",
+    "Hockenheim":                   "Germany",
+    "Sachsenring":                  "Germany",
+    "Oschersleben":                 "Germany",
+    "Motorsport Arena Oschersleben":"Germany",
+    "Oschersleben Motorsport Arena":"Germany",
+    "Bilster Berg":                 "Germany",
+    "Circuit Bilster Berg":         "Germany",
+    "Lausitzring":                  "Germany",
+    "Schleizer Dreieck":            "Germany",
+    "Meppen Racepark":              "Germany",
+    "Race Park Meppen":             "Germany",
+    "Porsche Ring":                 "Germany",
+    "Boxberg":                      "Germany",
+    "Gross Dölln":                  "Germany",
+
+    # ===== Netherlands =====
+    "Zandvoort":                    "Netherlands",
+    "TT Circuit Assen":             "Netherlands",
+
+    # ===== France =====
+    "Magny-Cours":                  "France",
+    "Le Mans (Bugatti)":            "France",
+    "Circuit Bugatti (Le Mans)":    "France",
+    "Paul Ricard":                  "France",
+    "Circuit Paul Ricard":          "France",
+    "Dijon-Prenois":                "France",
+    "Anneau du Rhin":               "France",
+    "Anneau-du-Rhin":               "France",
+    "Croix-en-Ternois":             "France",
+    "Mas du Clos":                  "France",
+    "Mirecourt":                    "France",
+    "Lédenon":                      "France",
+    "Pôle Mécanique Alès Cévennes": "France",
+    "Bresse":                       "France",
+    "Circuit de Bresse":            "France",
+    "Le Luc (circuit du Var)":      "France",
+    "Clastres":                     "France",
+    "Nogaro":                       "France",
+    "Fay de Bretagne":              "France",
+    "Vaison Piste":                 "France",
+    "Pau Arnos":                    "France",
+    "Pau-Arnos":                    "France",
+    "Charade":                      "France",
+    "Issoire":                      "France",
+    "Fontenay-le-Comte (circuits de Vendée)": "France",
+    "Chenevières":                  "France",
+    "Lurcy-Levis":                  "France",
+    "Ladoux":                       "France",
+    "Mireval":                      "France",
+    "Chambley":                     "France",
+    "Circuits de l'Ouest Parisien (Dreux)": "France",
+    "Circuit des Ecuyers":          "France",
+    "Les Ecuyers":                  "France",
+    "Val de Vienne / Le Vigeant":   "France",
+    "Alès":                         "France",
+
+    # ===== Italy =====
+    "Imola":                        "Italy",
+    "Mugello":                      "Italy",
+    "Mugello Circuit":              "Italy",
+    "Monza":                        "Italy",
+    "Misano":                       "Italy",
+    "Misano World Circuit":         "Italy",
+    "Vallelunga":                   "Italy",
+    "Autodromo di Vairano":         "Italy",
+    "Vairano":                      "Italy",
+    "Cremona Circuit":              "Italy",
+    "Tazio Nuvolari Circuit":       "Italy",
+    "Circuito Tazio Nuvolari":      "Italy",
+    "Franciacorta":                 "Italy",
+    "Balocco":                      "Italy",
+
+    # ===== Portugal =====
+    "Portimão":                     "Portugal",
+    "Estoril":                      "Portugal",
+
+    # ===== Spain =====
+    "Barcelona-Catalunya":          "Spain",
+    "Valencia (Ricardo Tormo)":     "Spain",
+    "Jerez":                        "Spain",
+    "Circuito de Navarra":          "Spain",
+    "Aragon Motorland":             "Spain",
+    "Monteblanco":                  "Spain",
+    "Almeria (Iberia Circuit)":     "Spain",
+    "Guadix (Granada)":             "Spain",
+
+    # ===== Czech Republic =====
+    "Most":                         "Czech Republic",
+    "Autodrom Most":                "Czech Republic",
+    "Most Autodrom":                "Czech Republic",
+    "Brno":                         "Czech Republic",
+    "Automotodrom Brno":            "Czech Republic",
+
+    # ===== Slovakia =====
+    "Slovakia Ring":                "Slovakia",
+    "Slovakiaring":                 "Slovakia",
+
+    # ===== Hungary =====
+    "Hungaroring":                  "Hungary",
+    "Pannonia Ring":                "Hungary",
+    "Balaton Park Circuit":         "Hungary",
+
+    # ===== Austria =====
+    "Red Bull Ring":                "Austria",
+    "Red Bull Ring / Spielberg":    "Austria",
+    "Salzburgring":                 "Austria",
+
+    # ===== Other =====
+    "Grobnik Circuit | Rijeka":     "Croatia",
+    "Bikernieki Racetrack":         "Latvia",
+    "A1 Motor Park":                "Turkey",
+}

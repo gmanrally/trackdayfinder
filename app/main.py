@@ -228,6 +228,14 @@ async def _resolve_postcode_filter(postcode: Optional[str], radius_mi: Optional[
     return origin, r
 
 
+def _within_countries(events, countries: list[str]):
+    """Filter events to ones whose circuit is in one of the named countries.
+    Circuits with no country mapping are dropped when a country filter is on."""
+    from .circuit_countries import CIRCUIT_COUNTRY
+    wanted = set(countries)
+    return [e for e in events if CIRCUIT_COUNTRY.get(e.circuit) in wanted]
+
+
 def _within_radius(events, origin: tuple[float, float], radius_mi: float):
     """Filter Event list to ones whose circuit's CIRCUIT_COORDS entry is within radius_mi."""
     from .circuit_coords import CIRCUIT_COORDS
@@ -380,12 +388,14 @@ async def index(request: Request,
                 from_offset: Optional[str] = None,
                 month: Optional[str] = None,
                 postcode: Optional[str] = None,
-                radius_mi: Optional[str] = None):
+                radius_mi: Optional[str] = None,
+                country: Optional[str] = None):
     weekdays = request.query_params.getlist("weekdays")
-    circuits_sel = _multi(request, "circuit")
-    sources_sel  = _multi(request, "source")
-    sessions_sel = _multi(request, "session")
-    months_sel   = _multi(request, "month")
+    circuits_sel  = _multi(request, "circuit")
+    sources_sel   = _multi(request, "source")
+    sessions_sel  = _multi(request, "session")
+    months_sel    = _multi(request, "month")
+    countries_sel = _multi(request, "country")
     today = date.today()
     # `from_offset` is the JS pagination cursor — number of days from today
     # where the visible window starts. Default 0 → show today .. today+30d.
@@ -407,7 +417,7 @@ async def index(request: Request,
         # so they don't get a misleading "0 results" when matching events
         # exist further in the future.
         any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
-                          or vehicle or from_ or to or weekdays or geo_active)
+                          or vehicle or from_ or to or weekdays or geo_active or countries_sel)
         if any_filter:
             windowed = q
             has_more = False
@@ -418,9 +428,16 @@ async def index(request: Request,
         events = s.exec(windowed).all()
         if geo_active:
             events = _within_radius(events, origin, radius_value)
+        if countries_sel:
+            events = _within_countries(events, countries_sel)
         # Total matching the user's filters (no pagination) — for the count pill.
-        if geo_active:
-            total_count = len(_within_radius(s.exec(q).all(), origin, radius_value))
+        if geo_active or countries_sel:
+            base = s.exec(q).all()
+            if geo_active:
+                base = _within_radius(base, origin, radius_value)
+            if countries_sel:
+                base = _within_countries(base, countries_sel)
+            total_count = len(base)
         else:
             from sqlmodel import func
             total_count = s.exec(select(func.count()).select_from(q.subquery())).one()
@@ -432,6 +449,7 @@ async def index(request: Request,
         # Build the Circuit dropdown so it ONLY shows circuits that have at
         # least one event matching the *currently active* Source/Vehicle/Session
         # filters (excluding the Circuit filter itself, so the user can change it).
+        from .circuit_countries import CIRCUIT_COUNTRY
         def _matches_other_filters(e: Event) -> bool:
             if vehicle and e.vehicle_type != vehicle:
                 return False
@@ -444,8 +462,23 @@ async def index(request: Request,
                     elif s_ == "region-eu": hits.append(e.region == "EU")
                     else: hits.append(e.source == s_)
                 if not any(hits): return False
+            if countries_sel and CIRCUIT_COUNTRY.get(e.circuit) not in countries_sel:
+                return False
             return True
         circuits = sorted({e.circuit for e in all_events if _matches_other_filters(e)})
+
+        # Country dropdown: count active events per country across the current
+        # event set (independent of the Country filter itself so users can pick
+        # an additional one). Sorted by event count descending.
+        from collections import Counter
+        country_counts = Counter()
+        for e in all_events:
+            if vehicle and e.vehicle_type != vehicle: continue
+            if sessions_sel and e.session not in sessions_sel: continue
+            if circuits_sel and e.circuit not in circuits_sel: continue
+            c = CIRCUIT_COUNTRY.get(e.circuit)
+            if c: country_counts[c] += 1
+        countries_list = [(c, n) for c, n in country_counts.most_common()]
 
         # Source dropdown grouped by region: UK organisers, then EU.
         from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
@@ -471,6 +504,7 @@ async def index(request: Request,
         "sources_grouped": sources_grouped,
         "sessions": sessions,
         "months": months,
+        "countries": countries_list,
         "weekday_choices": WEEKDAY_CHOICES,
         "last_run": last.finished_at.strftime("%Y-%m-%d %H:%M") if last and last.finished_at else None,
         "now_year": today.year,
@@ -479,7 +513,7 @@ async def index(request: Request,
         "qs_no_sort": _qs_no_sort(request),
         "filters": {
             "circuits": circuits_sel, "sources": sources_sel, "sessions": sessions_sel,
-            "months": months_sel,
+            "months": months_sel, "countries": countries_sel,
             "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
@@ -503,14 +537,16 @@ async def index_chunk(request: Request,
                       from_offset: Optional[str] = None,
                       month: Optional[str] = None,
                       postcode: Optional[str] = None,
-                      radius_mi: Optional[str] = None):
+                      radius_mi: Optional[str] = None,
+                      country: Optional[str] = None):
     """Returns rendered <tr>s for the next 30-day window, plus a has_more flag.
     Used by the index page's infinite-scroll JS."""
     weekdays = request.query_params.getlist("weekdays")
-    circuits_sel = _multi(request, "circuit")
-    sources_sel  = _multi(request, "source")
-    sessions_sel = _multi(request, "session")
-    months_sel   = _multi(request, "month")
+    circuits_sel  = _multi(request, "circuit")
+    sources_sel   = _multi(request, "source")
+    sessions_sel  = _multi(request, "session")
+    months_sel    = _multi(request, "month")
+    countries_sel = _multi(request, "country")
     today = date.today()
     try:
         offset = max(0, int(from_offset or 0))
@@ -527,7 +563,7 @@ async def index_chunk(request: Request,
                                       from_, to, max_price, hide_sold_out, sort,
                                       weekdays=weekdays, month=months_sel)
         any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
-                          or vehicle or from_ or to or weekdays or geo_active)
+                          or vehicle or from_ or to or weekdays or geo_active or countries_sel)
         if any_filter:
             events = s.exec(q).all()
             has_more = False
@@ -538,6 +574,8 @@ async def index_chunk(request: Request,
             has_more = beyond is not None
         if geo_active:
             events = _within_radius(events, origin, radius_value)
+        if countries_sel:
+            events = _within_countries(events, countries_sel)
 
     tmpl = templates.env.get_template("_event_row.html")
     html = "".join(tmpl.render(e=ev, request=request) for ev in events)
@@ -859,14 +897,17 @@ async def calendar_page(request: Request,
                         hide_sold_out: Optional[str] = None,
                         month: Optional[str] = None,
                         postcode: Optional[str] = None,
-                        radius_mi: Optional[str] = None):
+                        radius_mi: Optional[str] = None,
+                        country: Optional[str] = None):
     """Month-grid calendar view of all upcoming events. Same filters as index."""
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
+    from .circuit_countries import CIRCUIT_COUNTRY
     weekdays = request.query_params.getlist("weekdays")
-    circuits_sel = _multi(request, "circuit")
-    sources_sel  = _multi(request, "source")
-    sessions_sel = _multi(request, "session")
-    months_sel   = _multi(request, "month")
+    circuits_sel  = _multi(request, "circuit")
+    sources_sel   = _multi(request, "source")
+    sessions_sel  = _multi(request, "session")
+    months_sel    = _multi(request, "month")
+    countries_sel = _multi(request, "country")
     today = date.today()
     # Pick an initial date for the calendar so it lands on the user's filtered
     # range. Priority: first selected month > from_ filter > earliest matching event > today.
@@ -884,6 +925,8 @@ async def calendar_page(request: Request,
         events = s.exec(q).all()
         if origin is not None:
             events = _within_radius(events, origin, radius_value)
+        if countries_sel:
+            events = _within_countries(events, countries_sel)
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
     # If no explicit date filter set but other filters narrow events, jump to
     # the earliest matching one so the user actually sees results immediately.
@@ -919,6 +962,8 @@ async def calendar_page(request: Request,
                 elif s_ == "region-eu": hits.append(e.region == "EU")
                 else: hits.append(e.source == s_)
             if not any(hits): return False
+        if countries_sel and CIRCUIT_COUNTRY.get(e.circuit) not in countries_sel:
+            return False
         return True
     circuits = sorted({e.circuit for e in all_events_today if _matches_other_filters(e)})
     source_slugs = sorted({e.source for e in all_events_today})
@@ -931,6 +976,12 @@ async def calendar_page(request: Request,
     sources_grouped = [g for g in sources_grouped if g[1]]
     sessions = sorted({e.session for e in all_events_today if e.session})
     months = _build_month_choices(all_events_today)
+    from collections import Counter
+    country_counts = Counter()
+    for e in all_events_today:
+        c = CIRCUIT_COUNTRY.get(e.circuit)
+        if c: country_counts[c] += 1
+    countries_list = country_counts.most_common()
 
     return templates.TemplateResponse(request, "calendar.html", {
         "events_json": events_json,
@@ -941,10 +992,11 @@ async def calendar_page(request: Request,
         "sources_grouped": sources_grouped,
         "sessions": sessions,
         "months": months,
+        "countries": countries_list,
         "weekday_choices": WEEKDAY_CHOICES,
         "filters": {
             "circuits": circuits_sel, "sources": sources_sel, "sessions": sessions_sel,
-            "months": months_sel,
+            "months": months_sel, "countries": countries_sel,
             "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
@@ -966,17 +1018,20 @@ async def map_page(request: Request,
                    hide_sold_out: Optional[str] = None,
                    month: Optional[str] = None,
                    postcode: Optional[str] = None,
-                   radius_mi: Optional[str] = None):
+                   radius_mi: Optional[str] = None,
+                   country: Optional[str] = None):
     """Interactive map of UK + EU circuits with upcoming events.
     Honours the same filter set as the index calendar."""
     from collections import Counter
     from .circuit_coords import CIRCUIT_COORDS
+    from .circuit_countries import CIRCUIT_COUNTRY
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
     weekdays = request.query_params.getlist("weekdays")
-    circuits_sel = _multi(request, "circuit")
-    sources_sel  = _multi(request, "source")
-    sessions_sel = _multi(request, "session")
-    months_sel   = _multi(request, "month")
+    circuits_sel  = _multi(request, "circuit")
+    sources_sel   = _multi(request, "source")
+    sessions_sel  = _multi(request, "session")
+    months_sel    = _multi(request, "month")
+    countries_sel = _multi(request, "country")
     today = date.today()
     origin, radius_value = await _resolve_postcode_filter(postcode, radius_mi)
     with db_session() as s:
@@ -986,6 +1041,8 @@ async def map_page(request: Request,
         events = s.exec(q).all()
         if origin is not None:
             events = _within_radius(events, origin, radius_value)
+        if countries_sel:
+            events = _within_countries(events, countries_sel)
 
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
 
@@ -1000,6 +1057,8 @@ async def map_page(request: Request,
                 elif s_ == "region-eu": hits.append(e.region == "EU")
                 else: hits.append(e.source == s_)
             if not any(hits): return False
+        if countries_sel and CIRCUIT_COUNTRY.get(e.circuit) not in countries_sel:
+            return False
         return True
     circuits = sorted({e.circuit for e in all_events_today if _matches_other_filters(e)})
     source_slugs = sorted({e.source for e in all_events_today})
@@ -1012,6 +1071,11 @@ async def map_page(request: Request,
     sources_grouped = [g for g in sources_grouped if g[1]]
     sessions = sorted({e.session for e in all_events_today if e.session})
     months = _build_month_choices(all_events_today)
+    country_counts: Counter = Counter()
+    for e in all_events_today:
+        c_ = CIRCUIT_COUNTRY.get(e.circuit)
+        if c_: country_counts[c_] += 1
+    countries_list = country_counts.most_common()
 
     from .circuit_coords import CIRCUIT_WEBSITES, EXTERNAL_CIRCUITS, EXTERNAL_REGION
     # External venues have no scraped events — decide if they can plausibly
@@ -1058,6 +1122,9 @@ async def map_page(request: Request,
         # buckets — events, external "?" markers, and inactive greys).
         if origin is not None and haversine_miles(origin, (lat, lng)) > radius_value:
             continue
+        # Skip circuits outside the country filter.
+        if countries_sel and CIRCUIT_COUNTRY.get(circuit_name) not in countries_sel:
+            continue
         n = counts.get(circuit_name, 0)
         marker = {
             "name": circuit_name,
@@ -1097,10 +1164,11 @@ async def map_page(request: Request,
         "sources_grouped": sources_grouped,
         "sessions": sessions,
         "months": months,
+        "countries": countries_list,
         "weekday_choices": WEEKDAY_CHOICES,
         "filters": {
             "circuits": circuits_sel, "sources": sources_sel, "sessions": sessions_sel,
-            "months": months_sel,
+            "months": months_sel, "countries": countries_sel,
             "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),

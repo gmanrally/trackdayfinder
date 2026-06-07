@@ -68,6 +68,24 @@
       </div>
     </div>
   </label>
+  <label style="position:relative">Country
+    <button type="button" class="when-btn check-trigger" data-target="country-pop">
+      <span class="check-summary" data-default="Any">Any</span>
+      <span style="margin-left:6px;color:var(--muted-2)">▾</span>
+    </button>
+    <div id="country-pop" class="when-pop check-pop" hidden data-name="country">
+      <div class="check-search-row"><input type="text" class="check-search" placeholder="Type to filter countries…" autocomplete="off"></div>
+      <div class="when-section check-list" style="max-height:280px;overflow-y:auto">
+        {% for name, n in (countries or []) %}
+        <label class="check-item"><input type="checkbox" form="filters-form" name="country" value="{{ name }}" {% if name in (filters.countries or []) %}checked{% endif %}> {{ name }} <span style="color:var(--muted);font-size:11px;margin-left:auto">{{ n }}</span></label>
+        {% endfor %}
+      </div>
+      <div class="check-actions">
+        <button type="button" class="btn-clear check-clear" style="font-size:12px;padding:5px 10px">Clear</button>
+        <button type="button" class="book-btn check-apply" style="font-size:12px;padding:5px 14px">Apply</button>
+      </div>
+    </div>
+  </label>
   {# ------ "When" combined popover: dates + month + weekdays in one button ------ #}
   <label style="position:relative">When
     <button type="button" id="when-trigger" class="when-btn">
@@ -316,7 +334,7 @@
       // Names owned by the popovers — we read these only from the popovers
       // (not from FormData) to avoid double-counting when HTML5 form= keeps
       // the checkbox associated with the form.
-      var POPOVER_NAMES = new Set(['circuit', 'session', 'source']);
+      var POPOVER_NAMES = new Set(['circuit', 'session', 'source', 'country']);
       // 1) Form descendants minus popover-owned names.
       var fd = new FormData(form);
       for (var pair of fd.entries()) {
