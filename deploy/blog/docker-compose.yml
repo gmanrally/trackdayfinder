@@ -1,0 +1,52 @@
+# WordPress + MariaDB stack for trackdayfinder.co.uk/blog
+#
+# Lives at /opt/trackdayfinder-blog/ on the VPS, separate from the main
+# trackdayfinder docker-compose so a WP outage doesn't risk the main site.
+#
+# Sub-directory install: WordPress thinks it lives at /blog. nginx in front
+# strips/preserves the path. See nginx.snippet.conf for the routing block.
+#
+# Replace the three CHANGE_ME_ secrets before bringing the stack up.
+
+services:
+  blog-db:
+    image: mariadb:11
+    container_name: blog-db
+    restart: always
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: CHANGE_ME_DB_PASSWORD
+      MARIADB_ROOT_PASSWORD: CHANGE_ME_DB_ROOT_PASSWORD
+    volumes:
+      - blog-db-data:/var/lib/mysql
+
+  blog:
+    image: wordpress:6-php8.3-fpm-alpine
+    container_name: blog
+    restart: always
+    depends_on:
+      - blog-db
+    environment:
+      WORDPRESS_DB_HOST: blog-db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: CHANGE_ME_DB_PASSWORD
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_TABLE_PREFIX: wp_
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_HOME', 'https://trackdayfinder.co.uk/blog');
+        define('WP_SITEURL', 'https://trackdayfinder.co.uk/blog');
+        define('FORCE_SSL_ADMIN', true);
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            $$_SERVER['HTTPS'] = 'on';
+        }
+    volumes:
+      - blog-wp-data:/var/www/html
+    ports:
+      - "127.0.0.1:9100:9000"
+    # Bound to 127.0.0.1 so it's only reachable via the nginx vhost.
+    # 9000 is PHP-FPM; nginx fastcgi-passes to it.
+
+volumes:
+  blog-db-data:
+  blog-wp-data:

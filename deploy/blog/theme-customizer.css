@@ -1,0 +1,169 @@
+/* TrackdayFinder blog skin — paste into:
+ *   WordPress admin → Appearance → Customize → Additional CSS
+ *
+ * Mirrors the main trackdayfinder.co.uk visual system: navy gradient
+ * header bar, red (#dc2626) accent, Inter typeface, white card surfaces,
+ * cool-grey borders. Picks up cleanly under any of the standard
+ * block-theme defaults (Twenty Twenty-Five / Twenty Twenty-Four). */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --tdf-fg: #0f172a;
+  --tdf-muted: #64748b;
+  --tdf-bg: #f1f5f9;
+  --tdf-card: #ffffff;
+  --tdf-line: #e2e8f0;
+  --tdf-accent: #dc2626;
+  --tdf-accent-2: #b91c1c;
+  --tdf-header-bg: #0b1220;
+  --tdf-header-fg: #f8fafc;
+  --tdf-radius: 8px;
+}
+
+html, body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+  color: var(--tdf-fg);
+  background: var(--tdf-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Header — navy gradient, white text, red accents on hover */
+.wp-block-template-part[data-area="header"],
+header.site-header,
+.site-header,
+header.wp-block-template-part {
+  background: linear-gradient(180deg, #0b1220 0%, #111a2e 100%) !important;
+  color: var(--tdf-header-fg) !important;
+  padding: 14px 24px !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.site-header a, .site-title a, .site-header .wp-block-navigation a {
+  color: var(--tdf-header-fg) !important;
+  text-decoration: none;
+}
+.site-header a:hover, .site-header .wp-block-navigation a:hover {
+  color: var(--tdf-accent) !important;
+}
+.site-title, .site-header h1 {
+  font-weight: 800 !important;
+  letter-spacing: -0.015em;
+}
+
+/* Main content padding + max-width to match the site shell */
+.wp-site-blocks > main,
+main.site-main,
+.site-content,
+.entry-content {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 32px 24px 60px;
+}
+
+/* Headings — same weight + tracking as the app pages */
+h1, h2, h3, h4 {
+  letter-spacing: -0.02em;
+  color: var(--tdf-fg);
+}
+h1 { font-size: 32px; font-weight: 800; margin: 0 0 8px; }
+h2 { font-size: 22px; font-weight: 700; margin: 28px 0 12px; }
+h3 { font-size: 18px; font-weight: 700; margin: 22px 0 10px; }
+
+/* Body links — red accent, underline on hover */
+a {
+  color: var(--tdf-accent);
+  text-decoration: none;
+  transition: color .15s;
+}
+a:hover { color: var(--tdf-accent-2); text-decoration: underline; }
+
+/* Cards — white surface, soft border, gentle shadow */
+article,
+.wp-block-post,
+.wp-block-latest-posts li,
+.wp-block-group.is-style-card {
+  background: var(--tdf-card);
+  border: 1px solid var(--tdf-line);
+  border-radius: var(--tdf-radius);
+  padding: 18px 22px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+/* Buttons — red primary, navy ghost */
+.wp-block-button__link,
+button.wp-block-search__button,
+input[type="submit"] {
+  background: var(--tdf-accent) !important;
+  color: #fff !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  padding: 9px 18px !important;
+  font-weight: 600 !important;
+  transition: background .15s, transform .05s !important;
+}
+.wp-block-button__link:hover,
+button.wp-block-search__button:hover,
+input[type="submit"]:hover {
+  background: var(--tdf-accent-2) !important;
+}
+.wp-block-button__link:active { transform: translateY(1px); }
+
+/* Forms — match input styling */
+input[type="text"], input[type="email"], input[type="search"], textarea, select {
+  background: #fff;
+  color: var(--tdf-fg);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 11px;
+  font: 14px 'Inter', system-ui, sans-serif;
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--tdf-accent);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+/* Sub-nav breadcrumb / meta */
+.entry-meta, .post-meta {
+  color: var(--tdf-muted);
+  font-size: 13px;
+}
+
+/* Footer — light card surface, restrained */
+footer.site-footer,
+.wp-block-template-part[data-area="footer"] {
+  background: var(--tdf-card);
+  border-top: 1px solid var(--tdf-line);
+  padding: 18px 24px;
+  text-align: center;
+  color: var(--tdf-muted);
+  font-size: 12px;
+}
+footer.site-footer a { color: var(--tdf-accent); }
+
+/* Code blocks — match the cool-grey palette */
+pre, code, .wp-block-code {
+  background: #f8fafc;
+  border: 1px solid var(--tdf-line);
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-family: ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+:not(pre) > code { padding: 2px 6px; }
+
+/* Pull quote / blockquote — red left bar */
+blockquote, .wp-block-quote {
+  border-left: 4px solid var(--tdf-accent);
+  padding-left: 16px;
+  margin: 18px 0;
+  color: var(--tdf-fg);
+  font-style: normal;
+}
+
+/* Misc tightening — block themes default to wide rhythms */
+p, li { line-height: 1.55; }
+hr { border: 0; border-top: 1px solid var(--tdf-line); margin: 28px 0; }
