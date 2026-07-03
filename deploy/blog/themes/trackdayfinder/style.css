@@ -1,0 +1,192 @@
+/*
+Theme Name: TrackdayFinder
+Theme URI: https://trackdayfinder.co.uk/
+Author: TrackdayFinder
+Description: Blog theme that mirrors the trackdayfinder.co.uk main-site header, navigation and styling exactly.
+Version: 1.2.0
+License: GNU General Public License v2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: trackdayfinder
+*/
+
+:root {
+  --fg:#0f172a;
+  --muted:#64748b;
+  --muted-2:#94a3b8;
+  --bg:#f1f5f9;
+  --card:#ffffff;
+  --line:#e2e8f0;
+  --line-2:#cbd5e1;
+  --accent:#dc2626;
+  --accent-2:#b91c1c;
+  --hi-bg:#fef2f2;
+  --header-bg:#0b1220;
+  --header-fg:#f8fafc;
+  --shadow-sm: 0 1px 2px rgba(15,23,42,0.05);
+  --shadow:    0 4px 12px rgba(15,23,42,0.06);
+  --radius: 8px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 14px/1.55 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============ Header (mirrors the main site shell) ============ */
+header {
+  padding: 14px 24px;
+  background: linear-gradient(180deg, #0b1220 0%, #111a2e 100%);
+  color: var(--header-fg);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex: 0 0 auto;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05), 0 6px 20px rgba(0,0,0,0.25);
+}
+.brand-block { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.brand-block .tagline { padding-right: 4px; line-height: 1.1; }
+.brand-link { display: inline-flex; align-items: center; line-height: 0; align-self: flex-start; }
+.brand-logo { height: 44px; width: auto; display: block; }
+@media (max-width: 640px) { .brand-logo { height: 34px; } }
+.tagline { color: #94a3b8; font-size: 13px; }
+.tagline a { color: #f8fafc; text-decoration: none; border-bottom: 1px dashed #475569; }
+.tagline a:hover { color: #fff; border-color: #fff; }
+.brand-gmracing { font-weight: 600; color: #ffffff; text-decoration: none; }
+.brand-gmracing .brand-r { color: var(--accent); }
+header .brand-gmracing .brand-r { color: #ffffff; }
+
+.top-nav { display: flex; gap: 14px; flex-wrap: wrap; }
+.top-nav a {
+  color: #f8fafc; text-decoration: none; font-weight: 500; font-size: 13px;
+  padding: 6px 12px; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: background .15s, border-color .15s;
+}
+.top-nav a:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
+
+.meta {
+  color: #94a3b8; font-size: 12px; margin-left: auto;
+  background: rgba(255,255,255,0.04); padding: 6px 12px; border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ============ Sub-nav breadcrumb ============ */
+nav.crumbs {
+  padding: 10px 24px; background: #fff; border-bottom: 1px solid var(--line);
+  font-size: 13px; color: var(--muted);
+}
+nav.crumbs a { color: var(--accent); text-decoration: none; }
+nav.crumbs a:hover { text-decoration: underline; }
+
+/* ============ Content shell ============ */
+main.page {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+}
+
+article.tdf-post, .tdf-page {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+h1, h2, h3, h4 { letter-spacing: -0.02em; color: var(--fg); }
+h1 { font-size: 32px; font-weight: 800; margin: 0 0 8px; }
+h2 { font-size: 22px; font-weight: 700; margin: 28px 0 12px; }
+h3 { font-size: 18px; font-weight: 700; margin: 22px 0 10px; }
+h4 { font-size: 16px; font-weight: 700; margin: 18px 0 8px; }
+p, li { line-height: 1.6; }
+a { color: var(--accent); text-decoration: none; transition: color .15s; }
+a:hover { color: var(--accent-2); text-decoration: underline; }
+
+article.tdf-post h2 { margin-top: 0; }
+article.tdf-post h2 a, .tdf-page h1 a { color: var(--fg); }
+
+.tdf-post-meta {
+  color: var(--muted); font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 12px;
+}
+.tdf-post-meta a { color: var(--muted); border-bottom: 1px dotted var(--muted-2); text-decoration: none; }
+.tdf-post-meta a:hover { color: var(--accent); border-color: var(--accent); }
+
+.tdf-content { font-size: 15px; line-height: 1.65; }
+.tdf-content > * { margin-top: 0; }
+.tdf-content p { margin: 0 0 14px; }
+.tdf-content img { max-width: 100%; height: auto; border-radius: 6px; }
+.tdf-content ul, .tdf-content ol { padding-left: 22px; margin: 0 0 14px; }
+.tdf-content pre, .tdf-content code {
+  background: #f8fafc; border: 1px solid var(--line); border-radius: 6px;
+  padding: 12px 14px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+}
+.tdf-content :not(pre) > code { padding: 2px 6px; }
+.tdf-content blockquote {
+  border-left: 4px solid var(--accent); padding-left: 16px; margin: 18px 0; color: var(--fg);
+}
+
+.tdf-readmore {
+  display: inline-block; margin-top: 10px; padding: 6px 14px;
+  background: var(--accent); color: #fff !important;
+  border-radius: 6px; font-weight: 600; font-size: 13px;
+  text-decoration: none !important; transition: background .15s;
+}
+.tdf-readmore:hover { background: var(--accent-2); }
+
+.tdf-pagination { display: flex; gap: 8px; justify-content: center; margin: 24px 0; flex-wrap: wrap; }
+.tdf-pagination a, .tdf-pagination span {
+  background: #fff; border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 12px; color: var(--fg); font-weight: 600; font-size: 13px; text-decoration: none;
+}
+.tdf-pagination a:hover { border-color: var(--accent); color: var(--accent); }
+.tdf-pagination .current { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.tdf-search { display: flex; gap: 6px; margin: 6px 0 0; }
+.tdf-search input[type=search] {
+  flex: 1 1 auto; padding: 8px 11px; border: 1px solid var(--line-2);
+  border-radius: 6px; font: 14px 'Inter', system-ui, sans-serif;
+}
+.tdf-search input[type=search]:focus {
+  outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(220,38,38,0.15);
+}
+.tdf-search button {
+  background: var(--accent); color: #fff; border: 0; border-radius: 6px;
+  padding: 8px 16px; font-weight: 600; cursor: pointer;
+}
+.tdf-search button:hover { background: var(--accent-2); }
+
+/* ============ Footer (mirrors the main site) ============ */
+footer {
+  flex: 0 0 auto;
+  text-align: center; padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted); font-size: 12px; background: var(--card);
+}
+footer a { color: #1f2937; font-weight: 600; text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+footer .brand-r { color: var(--accent); }
+
+/* ============ Mobile ============ */
+@media (max-width: 720px) {
+  header { padding: 10px 14px; gap: 8px; }
+  .meta { display: none; }
+  main.page { padding: 18px 14px 40px; }
+  article.tdf-post, .tdf-page { padding: 18px 18px; }
+  h1 { font-size: 26px; }
+}

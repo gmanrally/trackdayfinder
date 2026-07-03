@@ -414,6 +414,15 @@
 {% if umami_src and umami_website_id %}
 <script defer src="{{ umami_src }}" data-website-id="{{ umami_website_id }}"></script>
 {% endif %}
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-73PF9R6CT0"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-73PF9R6CT0');
+</script>
 </head>
 <body>
 
