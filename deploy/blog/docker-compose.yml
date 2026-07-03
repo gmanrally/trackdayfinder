@@ -36,8 +36,11 @@ services:
       WORDPRESS_CONFIG_EXTRA: |
         define('WP_HOME', 'https://trackdayfinder.co.uk/blog');
         define('WP_SITEURL', 'https://trackdayfinder.co.uk/blog');
-        define('FORCE_SSL_ADMIN', true);
-        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+        # Do NOT set FORCE_SSL_ADMIN here. nginx already passes fastcgi_param
+        # HTTPS on + X-Forwarded-Proto, so WordPress detects SSL correctly.
+        # FORCE_SSL_ADMIN=true caused an ERR_TOO_MANY_REDIRECTS loop on
+        # /blog/wp-admin/ (it re-invalidated the session each login).
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && strpos($$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) {
             $$_SERVER['HTTPS'] = 'on';
         }
     volumes:
