@@ -99,6 +99,8 @@ CIRCUIT_COORDS: dict[str, tuple[float, float]] = {
     "Circuito Tazio Nuvolari":         (45.1611,  9.4117),
     "Balaton Park Circuit":            (47.0381, 17.7842),
     "Almeria (Iberia Circuit)":        (37.0386, -2.3650),
+    "Andalucia Circuit":               (37.0386, -2.3650),   # Almería, Spain
+    "Look and Run Circuit":            (37.0900, -2.3600),   # Almería, Spain
     "Porsche Ring":                    (51.4317, 12.2986),
     "Circuit Jules Tacheny Mettet":    (50.3214,  4.6708),
     "Circuit des Ecuyers":             (49.0150,  3.4150),

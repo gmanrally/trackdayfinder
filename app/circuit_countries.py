@@ -155,6 +155,8 @@ CIRCUIT_COUNTRY: dict[str, str] = {
     "Aragon Motorland":             "Spain",
     "Monteblanco":                  "Spain",
     "Almeria (Iberia Circuit)":     "Spain",
+    "Andalucia Circuit":            "Spain",
+    "Look and Run Circuit":         "Spain",
     "Guadix (Granada)":             "Spain",
     "Almeria":                      "Spain",
     "Andalucia":                    "Spain",

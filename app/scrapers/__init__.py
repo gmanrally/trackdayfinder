@@ -5,7 +5,7 @@ from . import (
     rsr_nurburg, gedlich, trackdays_events,
     pembrey, llandow, kirkistown,
     trackday_solutions, curbstone, lotus_on_track, df_trackdays, skylimit, europa,
-    three_sisters, castle_combe,
+    three_sisters, castle_combe, paddock_gt,
 )
 
 SCRAPERS = {
@@ -36,6 +36,7 @@ SCRAPERS = {
     "europa": europa,
     "three_sisters": three_sisters,
     "castle_combe": castle_combe,
+    "paddock_gt": paddock_gt,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -68,6 +69,7 @@ ORGANISER_DISPLAY = {
     "europa": "Europa Trackdays (aggregator)",
     "three_sisters": "Three Sisters Circuit",
     "castle_combe": "Castle Combe Circuit",
+    "paddock_gt": "Paddock GT Club",
 }
 
 # Region grouping for the dropdown (UK first, EU after).
@@ -90,5 +92,6 @@ SOURCE_REGION = {
     "europa": "EU",
     "three_sisters": "UK",
     "castle_combe": "UK",
+    "paddock_gt": "EU",
     "kirkistown": "UK",
 }
