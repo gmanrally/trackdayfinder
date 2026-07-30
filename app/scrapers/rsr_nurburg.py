@@ -17,7 +17,7 @@ import httpx
 from ._base import RawEvent, UA
 
 SOURCE_SLUG = "rsr_nurburg"
-ORGANISER = "RSRNurburg"
+ORGANISER = "RSR Nürburgring"
 FEED_URL = "https://rsrbooking.com/events/populate"
 # RSR has no public per-event URL. /bookings/select-event is the entry point to
 # their booking wizard. The date param isn't read by their UI yet but we send it
@@ -31,6 +31,16 @@ DEBUG_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "debug"
 TF_SOURCE = "nurburgring_tf"
 TF_ORGANISER = "Nürburgring (Touristenfahrten)"
 TF_BOOKING_URL = "https://www.nuerburgring.de/driving/touristdrives"
+
+# The generic open-pitlane "Nordschleife Trackday" days sold on rsrbooking are
+# actually operated by Destination Nürburgring Track Days — RSR only resells the
+# tickets. Re-tag them so the organiser shown is correct. RSR's OWN Nordschleife
+# products (Driver Training, XL Training Course, Perfektionstraining, Premium)
+# stay attributed to RSR.
+DN_SOURCE = "destination_nurburgring"
+DN_ORGANISER = "Destination Nürburgring Track Days"
+_DN_TITLE_RE = re.compile(r"\bnordschleife\b.*\btrackday\b|\btrackday\b.*\bnordschleife\b", re.I)
+_RSR_OWN_RE = re.compile(r"training|course|perfektion|premium|combo", re.I)
 
 # Approximate published TF session windows. Real times shift through the season
 # (mainly daylight) — this is a useful indicator, not gospel. Source: official
@@ -136,6 +146,19 @@ async def fetch() -> list[RawEvent]:
             continue
 
         booking_url = BOOKING_URL.format(date=event_date.strftime("%d-%m-%Y"))
+
+        # Generic Nordschleife open-pitlane trackday → Destination Nürburgring,
+        # unless it's one of RSR's own branded training/premium products.
+        if _DN_TITLE_RE.search(title) and not _RSR_OWN_RE.search(title):
+            out.append(RawEvent(
+                source=DN_SOURCE, organiser=DN_ORGANISER,
+                circuit_raw=circuit, event_date=event_date, booking_url=booking_url,
+                title=title, notes="Booked via RSR Nürburgring",
+                currency="EUR", region="EU",
+                is_package=is_package, session="day", external_id=eid,
+            ))
+            continue
+
         out.append(RawEvent(
             source=SOURCE_SLUG, organiser=ORGANISER,
             circuit_raw=circuit, event_date=event_date, booking_url=booking_url,
