@@ -1206,6 +1206,15 @@ async def map_page(request: Request,
                 continue
             inactive_points.append(marker)
 
+    # Query string of the currently-active filters (minus circuit, which the
+    # popup sets itself) so the "All dates" link lands on the filtered list
+    # view keeping vehicle/source/etc applied instead of dropping to the
+    # filter-less circuit SEO page.
+    from urllib.parse import urlencode
+    _carry = [(k, v) for k, v in request.query_params.multi_items()
+              if k not in ("circuit", "from_offset")]
+    map_carry_qs = urlencode(_carry)
+
     return templates.TemplateResponse(request, "map.html", {
         "points": points,
         "external_points": external_points,
@@ -1217,6 +1226,7 @@ async def map_page(request: Request,
         "sessions": sessions,
         "months": months,
         "countries": countries_list,
+        "map_carry_qs": map_carry_qs,
         "weekday_choices": WEEKDAY_CHOICES,
         "filters": {
             "circuits": circuits_sel, "sources": sources_sel, "sessions": sessions_sel,

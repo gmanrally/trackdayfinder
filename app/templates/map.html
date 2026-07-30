@@ -71,6 +71,9 @@
   const points = {{ points | tojson }};
   const externalPoints = {{ external_points | tojson }};
   const inactivePoints = {{ inactive_points | tojson }};
+  // Active filter query string, carried onto the "All dates" popup links so
+  // clicking through to the list keeps vehicle/source/etc applied.
+  const CARRY_QS = {{ map_carry_qs | tojson }};
   const map = L.map('trackday-map', { scrollWheelZoom: true }).setView([50.5, 4.5], 5);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 18,
@@ -108,7 +111,7 @@
       <div class="map-popup-name">${p.name}</div>
       <div class="map-popup-meta">${p.count} upcoming ${p.count === 1 ? 'event' : 'events'}${p.count > 5 ? ' — showing next 5' : ''}</div>
       <ul class="map-popup-events">${evList}</ul>
-      <a class="map-popup-link" href="/circuit/${p.slug}">All dates at ${p.name} →</a>`;
+      <a class="map-popup-link" href="/?circuit=${encodeURIComponent(p.name)}${CARRY_QS ? '&' + CARRY_QS : ''}">All dates at ${p.name} →</a>`;
     bindHoverPopup(m, html);
     bounds.push([p.lat, p.lng]);
   });
