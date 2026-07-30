@@ -170,24 +170,24 @@ def _build_month_choices(events) -> list[tuple[str, str]]:
     one upcoming event. Labels are bare month names ("May") unless the same
     month occurs in multiple years (then "May 26" / "May 27") — keeps the chip
     bar compact while staying unambiguous."""
-    months: dict[str, set[int]] = {}   # "May" -> {2026, 2027}
+    this_year = date.today().year
     keys: dict[str, str] = {}          # "2026-05" -> "May"
     for e in events:
         key = e.event_date.strftime("%Y-%m")
-        name = e.event_date.strftime("%B")
         if key in keys:
             continue
-        keys[key] = name
-        months.setdefault(name, set()).add(e.event_date.year)
+        keys[key] = e.event_date.strftime("%B")
     out: list[tuple[str, str]] = []
     for k in sorted(keys):
         name = keys[k]
-        years = months[name]
-        if len(years) > 1:
-            year_short = k.split("-")[0][-2:]
-            label = f"{name[:3]} {year_short}"
-        else:
+        year = int(k.split("-")[0])
+        # Bare month name for the current year; append a 2-digit year for any
+        # future year so "Jan" reading as "next January" is unambiguous and
+        # nobody mistakes it for a past month.
+        if year == this_year:
             label = name
+        else:
+            label = f"{name[:3]} {str(year)[-2:]}"
         out.append((k, label))
     return out
 
@@ -240,6 +240,24 @@ def _country_for_event(e) -> Optional[str]:
     if (e.region or "").upper() == "UK":
         return "United Kingdom"
     return None
+
+
+import re as _re
+# A day is "sessioned" (run in timed groups rather than open pit lane) when its
+# title/notes say so. Open-pit-lane and unknown-format days are NOT sessioned.
+_SESSIONED_RE = _re.compile(r"session", _re.I)
+_OPEN_PIT_RE = _re.compile(r"open\s*pit", _re.I)
+
+
+def _is_sessioned(e) -> bool:
+    blob = f"{e.title or ''} {e.notes or ''}"
+    if _OPEN_PIT_RE.search(blob):
+        return False   # explicitly open pit lane
+    return bool(_SESSIONED_RE.search(blob))
+
+
+def _drop_sessioned(events):
+    return [e for e in events if not _is_sessioned(e)]
 
 
 def _within_countries(events, countries: list[str]):
@@ -401,13 +419,15 @@ async def index(request: Request,
                 month: Optional[str] = None,
                 postcode: Optional[str] = None,
                 radius_mi: Optional[str] = None,
-                country: Optional[str] = None):
+                country: Optional[str] = None,
+                hide_sessioned: Optional[str] = None):
     weekdays = request.query_params.getlist("weekdays")
     circuits_sel  = _multi(request, "circuit")
     sources_sel   = _multi(request, "source")
     sessions_sel  = _multi(request, "session")
     months_sel    = _multi(request, "month")
     countries_sel = _multi(request, "country")
+    hide_sess = bool(hide_sessioned)
     today = date.today()
     # `from_offset` is the JS pagination cursor — number of days from today
     # where the visible window starts. Default 0 → show today .. today+30d.
@@ -429,7 +449,8 @@ async def index(request: Request,
         # so they don't get a misleading "0 results" when matching events
         # exist further in the future.
         any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
-                          or vehicle or from_ or to or weekdays or geo_active or countries_sel)
+                          or vehicle or from_ or to or weekdays or geo_active
+                          or countries_sel or hide_sess)
         if any_filter:
             windowed = q
             has_more = False
@@ -442,13 +463,17 @@ async def index(request: Request,
             events = _within_radius(events, origin, radius_value)
         if countries_sel:
             events = _within_countries(events, countries_sel)
+        if hide_sess:
+            events = _drop_sessioned(events)
         # Total matching the user's filters (no pagination) — for the count pill.
-        if geo_active or countries_sel:
+        if geo_active or countries_sel or hide_sess:
             base = s.exec(q).all()
             if geo_active:
                 base = _within_radius(base, origin, radius_value)
             if countries_sel:
                 base = _within_countries(base, countries_sel)
+            if hide_sess:
+                base = _drop_sessioned(base)
             total_count = len(base)
         else:
             from sqlmodel import func
@@ -529,6 +554,7 @@ async def index(request: Request,
             "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "hide_sessioned": hide_sess,
             "weekdays": list(weekdays),
             "postcode": postcode, "radius_mi": radius_mi,
         },
@@ -550,7 +576,8 @@ async def index_chunk(request: Request,
                       month: Optional[str] = None,
                       postcode: Optional[str] = None,
                       radius_mi: Optional[str] = None,
-                      country: Optional[str] = None):
+                      country: Optional[str] = None,
+                      hide_sessioned: Optional[str] = None):
     """Returns rendered <tr>s for the next 30-day window, plus a has_more flag.
     Used by the index page's infinite-scroll JS."""
     weekdays = request.query_params.getlist("weekdays")
@@ -559,6 +586,7 @@ async def index_chunk(request: Request,
     sessions_sel  = _multi(request, "session")
     months_sel    = _multi(request, "month")
     countries_sel = _multi(request, "country")
+    hide_sess = bool(hide_sessioned)
     today = date.today()
     try:
         offset = max(0, int(from_offset or 0))
@@ -575,7 +603,8 @@ async def index_chunk(request: Request,
                                       from_, to, max_price, hide_sold_out, sort,
                                       weekdays=weekdays, month=months_sel)
         any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
-                          or vehicle or from_ or to or weekdays or geo_active or countries_sel)
+                          or vehicle or from_ or to or weekdays or geo_active
+                          or countries_sel or hide_sess)
         if any_filter:
             events = s.exec(q).all()
             has_more = False
@@ -588,6 +617,8 @@ async def index_chunk(request: Request,
             events = _within_radius(events, origin, radius_value)
         if countries_sel:
             events = _within_countries(events, countries_sel)
+        if hide_sess:
+            events = _drop_sessioned(events)
 
     tmpl = templates.env.get_template("_event_row.html")
     html = "".join(tmpl.render(e=ev, request=request) for ev in events)
@@ -910,7 +941,8 @@ async def calendar_page(request: Request,
                         month: Optional[str] = None,
                         postcode: Optional[str] = None,
                         radius_mi: Optional[str] = None,
-                        country: Optional[str] = None):
+                        country: Optional[str] = None,
+                        hide_sessioned: Optional[str] = None):
     """Month-grid calendar view of all upcoming events. Same filters as index."""
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
     from .circuit_countries import CIRCUIT_COUNTRY
@@ -920,6 +952,7 @@ async def calendar_page(request: Request,
     sessions_sel  = _multi(request, "session")
     months_sel    = _multi(request, "month")
     countries_sel = _multi(request, "country")
+    hide_sess = bool(hide_sessioned)
     today = date.today()
     # Pick an initial date for the calendar so it lands on the user's filtered
     # range. Priority: first selected month > from_ filter > earliest matching event > today.
@@ -939,6 +972,8 @@ async def calendar_page(request: Request,
             events = _within_radius(events, origin, radius_value)
         if countries_sel:
             events = _within_countries(events, countries_sel)
+        if hide_sess:
+            events = _drop_sessioned(events)
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
     # If no explicit date filter set but other filters narrow events, jump to
     # the earliest matching one so the user actually sees results immediately.
@@ -1012,6 +1047,7 @@ async def calendar_page(request: Request,
             "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "hide_sessioned": hide_sess,
             "weekdays": list(weekdays),
             "postcode": postcode, "radius_mi": radius_mi,
         },
@@ -1031,7 +1067,8 @@ async def map_page(request: Request,
                    month: Optional[str] = None,
                    postcode: Optional[str] = None,
                    radius_mi: Optional[str] = None,
-                   country: Optional[str] = None):
+                   country: Optional[str] = None,
+                   hide_sessioned: Optional[str] = None):
     """Interactive map of UK + EU circuits with upcoming events.
     Honours the same filter set as the index calendar."""
     from collections import Counter
@@ -1044,6 +1081,7 @@ async def map_page(request: Request,
     sessions_sel  = _multi(request, "session")
     months_sel    = _multi(request, "month")
     countries_sel = _multi(request, "country")
+    hide_sess = bool(hide_sessioned)
     today = date.today()
     origin, radius_value = await _resolve_postcode_filter(postcode, radius_mi)
     with db_session() as s:
@@ -1055,6 +1093,8 @@ async def map_page(request: Request,
             events = _within_radius(events, origin, radius_value)
         if countries_sel:
             events = _within_countries(events, countries_sel)
+        if hide_sess:
+            events = _drop_sessioned(events)
 
         all_events_today = s.exec(select(Event).where(Event.event_date >= today)).all()
 
@@ -1184,6 +1224,7 @@ async def map_page(request: Request,
             "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "hide_sessioned": hide_sess,
             "weekdays": list(weekdays),
             "postcode": postcode, "radius_mi": radius_mi,
         },

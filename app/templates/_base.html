@@ -322,18 +322,20 @@
     .brand-logo { height: 32px; }
     .brand-block .tagline { font-size: 11px; padding-right: 2px; }
 
-    /* Toggle button visible; the bar collapses to a sticky drawer */
+    /* Toggle button visible; the bar collapses to a sticky drawer.
+       Styled as a clear red button so it reads as tappable. */
     .mobile-filters-toggle {
       display: block;
       position: sticky; top: 0; z-index: 25;
-      width: 100%; padding: 10px 14px;
-      background: var(--card); color: var(--fg);
-      border: 0; border-bottom: 1px solid var(--line);
-      font: 600 13px 'Inter', system-ui, sans-serif;
-      text-align: left; cursor: pointer;
-      box-shadow: var(--shadow-sm);
+      width: calc(100% - 20px); margin: 10px; padding: 11px 14px;
+      background: var(--accent); color: #fff;
+      border: 0; border-radius: 8px;
+      font: 700 14px 'Inter', system-ui, sans-serif;
+      text-align: center; cursor: pointer;
+      box-shadow: var(--shadow);
     }
-    .mobile-filters-toggle:hover { color: var(--accent); }
+    .mobile-filters-toggle:hover { background: var(--accent-2); }
+    .mobile-filters-toggle:active { transform: translateY(1px); }
     /* Hidden by default on mobile */
     form.filters { display: none; }
     /* Shown when body has `filters-open` class (toggle clicked).
