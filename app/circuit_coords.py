@@ -33,6 +33,7 @@ CIRCUIT_COORDS: dict[str, tuple[float, float]] = {
     "Castle Combe":         (51.4925, -2.2150),
     "Anglesey":             (53.1937, -4.5095),
     "Three Sisters":        (53.5128, -2.6125),
+    "Bicester":             (51.9003, -1.1170),   # Bicester Heritage, Oxfordshire
     "Bedford Autodrome":    (52.2244, -0.4651),
     "Thruxton":             (51.2122, -1.6028),
     "Croft":                (54.4564, -1.5589),

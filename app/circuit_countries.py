@@ -17,6 +17,7 @@ CIRCUIT_COUNTRY: dict[str, str] = {
     "Castle Combe":                 "United Kingdom",
     "Anglesey":                     "United Kingdom",
     "Three Sisters":                "United Kingdom",
+    "Bicester":                     "United Kingdom",
     "Bedford Autodrome":            "United Kingdom",
     "Thruxton":                     "United Kingdom",
     "Croft":                        "United Kingdom",
