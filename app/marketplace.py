@@ -35,7 +35,7 @@ def _match_event(circuit: str, event_date: date) -> Optional[int]:
 def create_listing(*, circuit: str, event_date: date, organiser: Optional[str],
                    asking_price_gbp: Optional[float], original_price_gbp: Optional[float],
                    transferable: str, seller_email: str, seller_name: Optional[str],
-                   contact_method: str, contact_value: str, note: Optional[str]) -> Listing:
+                   note: Optional[str]) -> Listing:
     """Create a pending listing and email the seller a verify link."""
     listing = Listing(
         circuit=circuit,
@@ -47,8 +47,6 @@ def create_listing(*, circuit: str, event_date: date, organiser: Optional[str],
         transferable=transferable if transferable in ("yes", "no", "unsure") else "unsure",
         seller_email=seller_email.strip().lower(),
         seller_name=seller_name,
-        contact_method=contact_method if contact_method in ("email", "phone", "whatsapp") else "email",
-        contact_value=contact_value.strip(),
         note=note,
         status="pending",
         verify_token=make_token(),
@@ -157,6 +155,84 @@ def past_listings(limit: int = 40) -> list[Listing]:
         return s.exec(select(Listing).where(
             Listing.status.in_(("sold", "expired"))
         ).order_by(Listing.event_date.desc()).limit(limit)).all()
+
+
+# ============ buyer → seller relay ============
+#
+# Contact details never render on the site. A signed-in buyer writes a message;
+# we email it to the seller with Reply-To set to the buyer, and the seller
+# decides whether to respond (revealing their address only then).
+
+INTROS_PER_BUYER_PER_DAY = 5      # across the whole board
+INTROS_PER_LISTING_PER_DAY = 10   # shields sellers from a flood
+REPEAT_DAYS = 7                   # one intro per buyer per listing per week
+
+MESSAGE_MAX = 1000
+
+
+def send_intro(listing_id: int, buyer, message: str) -> tuple[bool, str]:
+    """Relay a buyer's message to the seller. Returns (ok, user-facing text)."""
+    from .models import ContactRequest
+    import html as _html
+    from datetime import timedelta
+
+    message = (message or "").strip()
+    if not message:
+        return False, "Write a short message for the seller."
+    if len(message) > MESSAGE_MAX:
+        return False, f"Keep your message under {MESSAGE_MAX} characters."
+
+    with db_session() as s:
+        listing = s.exec(select(Listing).where(Listing.id == listing_id)).first()
+        if not listing or listing.status != "active":
+            return False, "That listing is no longer available."
+
+        day_ago = datetime.utcnow() - timedelta(days=1)
+        repeat_cutoff = datetime.utcnow() - timedelta(days=REPEAT_DAYS)
+        prior = s.exec(select(ContactRequest).where(
+            ContactRequest.buyer_user_id == buyer.id,
+            ContactRequest.listing_id == listing_id,
+            ContactRequest.created_at > repeat_cutoff,
+        )).first()
+        if prior:
+            return False, ("You've already contacted this seller — they can reply "
+                           "straight to your email.")
+        sent_today = len(s.exec(select(ContactRequest).where(
+            ContactRequest.buyer_user_id == buyer.id,
+            ContactRequest.created_at > day_ago,
+        )).all())
+        if sent_today >= INTROS_PER_BUYER_PER_DAY:
+            return False, "You've reached today's contact limit — try again tomorrow."
+        listing_today = len(s.exec(select(ContactRequest).where(
+            ContactRequest.listing_id == listing_id,
+            ContactRequest.created_at > day_ago,
+        )).all())
+        if listing_today >= INTROS_PER_LISTING_PER_DAY:
+            return False, ("This seller has had a lot of interest today — "
+                           "try again tomorrow.")
+
+        s.add(ContactRequest(listing_id=listing_id, buyer_user_id=buyer.id))
+        s.commit()
+        s.refresh(listing)  # commit expires attributes; reload before session closes
+
+    safe_msg = _html.escape(message).replace("\n", "<br>")
+    price = f"£{listing.asking_price_gbp:.0f}" if listing.asking_price_gbp else "—"
+    html_body = f"""
+    <p>A buyer on TrackdayFinder is interested in your space:</p>
+    <p><strong>{listing.circuit}</strong> — {listing.event_date:%a %d %b %Y} · Asking: {price}</p>
+    <div style="border-left:3px solid #dc2626;padding:8px 14px;margin:14px 0;color:#334155">
+      {safe_msg}
+    </div>
+    <p><strong>Just reply to this email</strong> — your reply goes straight to
+       {buyer.email}. We don't share your address unless you respond.</p>
+    <p style="color:#64748b;font-size:13px">{MARKETPLACE_FROM_NOTE}</p>
+    <p style="color:#94a3b8;font-size:12px">Getting too many messages? Mark the
+       listing sold or remove it with your manage link and they'll stop.</p>
+    """
+    send_mail(listing.seller_email,
+              f"Buyer interested in your {listing.circuit} space",
+              html_body, reply_to=buyer.email)
+    return True, "Message sent — the seller can reply straight to your email."
 
 
 def event_ids_with_listings() -> set[int]:

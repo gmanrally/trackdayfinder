@@ -1320,7 +1320,6 @@ async def spaces_create(request: Request):
     email = _f("seller_email").lower()
     circuit = _f("circuit")
     date_raw = _f("event_date")
-    contact_value = _f("contact_value")
 
     errors = []
     if "@" not in email or "." not in email:
@@ -1334,8 +1333,6 @@ async def spaces_create(request: Request):
         errors.append("Pick a valid date.")
     if event_date and event_date < date.today():
         errors.append("That date has already passed.")
-    if not contact_value:
-        errors.append("Add how buyers should contact you.")
 
     def _num(name: str) -> Optional[float]:
         raw = _f(name).replace("£", "").replace(",", "")
@@ -1363,8 +1360,6 @@ async def spaces_create(request: Request):
         transferable=_f("transferable") or "unsure",
         seller_email=email,
         seller_name=_f("seller_name") or None,
-        contact_method=_f("contact_method") or "email",
-        contact_value=contact_value,
         note=_f("note") or None,
     )
     return templates.TemplateResponse(request, "spaces/submitted.html", {
@@ -1412,6 +1407,47 @@ async def spaces_manage_post(request: Request, token: str):
     })
 
 
+@app.get("/spaces/contact/{listing_id}", response_class=HTMLResponse)
+async def spaces_contact(request: Request, listing_id: int):
+    """Buyer → seller relay: message form. Contact details never render on-site."""
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from starlette.responses import RedirectResponse
+    buyer = _buyer_from_request(request)
+    if not buyer:
+        return RedirectResponse("/spaces/login", status_code=302)
+    from .models import Listing
+    with db_session() as s:
+        listing = s.exec(select(Listing).where(
+            Listing.id == listing_id, Listing.status == "active")).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    return templates.TemplateResponse(request, "spaces/contact.html", {
+        "listing": listing, "buyer": buyer, "now_year": date.today().year,
+    })
+
+
+@app.post("/spaces/contact/{listing_id}", response_class=HTMLResponse)
+async def spaces_contact_post(request: Request, listing_id: int):
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from starlette.responses import RedirectResponse
+    buyer = _buyer_from_request(request)
+    if not buyer:
+        return RedirectResponse("/spaces/login", status_code=302)
+    from . import marketplace as mkt
+    from .models import Listing
+    with db_session() as s:
+        listing = s.exec(select(Listing).where(
+            Listing.id == listing_id, Listing.status == "active")).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    form = await request.form()
+    ok, msg = mkt.send_intro(listing_id, buyer, form.get("message") or "")
+    return templates.TemplateResponse(request, "spaces/contact.html", {
+        "listing": listing, "buyer": buyer, "now_year": date.today().year,
+        "sent": ok, "error": None if ok else msg, "confirmation": msg if ok else None,
+    }, status_code=200 if ok else 400)
+
+
 @app.get("/spaces/login", response_class=HTMLResponse)
 async def spaces_login(request: Request):
     """Buyer login — magic link so contact details stay off the public page."""
@@ -1435,7 +1471,7 @@ async def spaces_login_post(request: Request):
     user, _ = get_or_create_user(email)
     link = f"{CANONICAL_HOST}/spaces/session/{user.token}"
     send_mail(email, "Your TrackdayFinder sign-in link", f"""
-        <p>Click below to sign in and see seller contact details:</p>
+        <p>Click below to sign in and contact sellers on the spaces board:</p>
         <p><a href="{link}" style="background:#dc2626;color:#fff;padding:10px 18px;
            border-radius:6px;text-decoration:none;font-weight:600">Sign in</a></p>
         <p style="color:#94a3b8;font-size:12px">If you didn't request this, ignore it.</p>

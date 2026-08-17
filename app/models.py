@@ -117,11 +117,10 @@ class Listing(SQLModel, table=True):
     currency: str = Field(default="GBP")
     # The important caveat — can the organiser actually transfer the entry?
     transferable: str = Field(default="unsure")      # "yes" | "no" | "unsure"
-    # Seller
+    # Seller. Contact details are never displayed — buyers reach sellers via
+    # relayed intro email (ContactRequest), so there's nothing to harvest.
     seller_email: str = Field(index=True)
     seller_name: Optional[str] = None
-    contact_method: str = Field(default="email")     # "email" | "phone" | "whatsapp"
-    contact_value: str = ""                           # shown only to logged-in buyers
     note: Optional[str] = None
     # Lifecycle
     status: str = Field(default="pending", index=True)  # pending|active|sold|expired|removed
@@ -129,6 +128,16 @@ class Listing(SQLModel, table=True):
     manage_token: str = Field(index=True)            # seller self-manage (sold/delete)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     verified_at: Optional[datetime] = None
+
+
+class ContactRequest(SQLModel, table=True):
+    """One buyer→seller intro email, relayed by us with Reply-To the buyer.
+    Seller replies from their own inbox and chooses what to share — contact
+    details never render on the site. Doubles as the rate-limit ledger."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    listing_id: int = Field(index=True)
+    buyer_user_id: int = Field(index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 def init_db() -> None:

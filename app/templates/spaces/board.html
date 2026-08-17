@@ -62,10 +62,9 @@
         </td>
         <td data-label="Contact">
           {% if buyer %}
-            <strong>{{ l.contact_value }}</strong>
-            <div style="font-size:11px;color:var(--muted)">via {{ l.contact_method }}{% if l.seller_name %} · {{ l.seller_name }}{% endif %}</div>
+            <a class="book-btn" href="/spaces/contact/{{ l.id }}">Contact seller{% if l.seller_name %} ({{ l.seller_name }}){% endif %} →</a>
           {% else %}
-            <a class="book-btn" href="/spaces/login">Sign in to view</a>
+            <a class="book-btn" href="/spaces/login">Sign in to contact</a>
           {% endif %}
         </td>
       </tr>

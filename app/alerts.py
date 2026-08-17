@@ -36,7 +36,8 @@ CANONICAL_HOST = "https://trackdayfinder.co.uk"
 DEFAULT_FROM = "alerts@trackdayfinder.co.uk"
 
 
-def send_mail(to: str, subject: str, html_body: str, text_body: Optional[str] = None) -> None:
+def send_mail(to: str, subject: str, html_body: str, text_body: Optional[str] = None,
+              reply_to: Optional[str] = None) -> None:
     """Send (or log) one email. Honours EMAIL_OVERRIDE_TO."""
     override = os.environ.get("EMAIL_OVERRIDE_TO", "").strip()
     actual_to = override or to
@@ -47,7 +48,8 @@ def send_mail(to: str, subject: str, html_body: str, text_body: Optional[str] = 
         body = text_body or _strip_html(html_body)
         out = (f"\n=== EMAIL (log mode) ===\n"
                f"To:      {actual_to}" + (f"  (overridden from {to})\n" if override else "\n") +
-               f"From:    {sender}\n"
+               f"From:    {sender}\n" +
+               (f"Reply-To: {reply_to}\n" if reply_to else "") +
                f"Subject: {subject}\n\n{body}\n=== /EMAIL ===\n")
         # Best-effort: tolerate cp1252 / ascii consoles (Windows dev) by
         # replacing un-encodable characters rather than throwing.
@@ -64,6 +66,8 @@ def send_mail(to: str, subject: str, html_body: str, text_body: Optional[str] = 
     msg["Subject"] = subject
     msg["From"] = sender
     msg["To"] = actual_to
+    if reply_to:
+        msg["Reply-To"] = reply_to
     if text_body:
         msg.set_content(text_body)
         msg.add_alternative(html_body, subtype="html")
@@ -91,11 +95,14 @@ def send_mail(to: str, subject: str, html_body: str, text_body: Optional[str] = 
         # Inline import so requests isn't a hard dependency
         import httpx
         api_key = os.environ["RESEND_API_KEY"]
+        payload = {"from": sender, "to": [actual_to], "subject": subject,
+                   "html": html_body, "text": text_body or _strip_html(html_body)}
+        if reply_to:
+            payload["reply_to"] = reply_to
         r = httpx.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {api_key}"},
-            json={"from": sender, "to": [actual_to], "subject": subject,
-                  "html": html_body, "text": text_body or _strip_html(html_body)},
+            json=payload,
             timeout=20,
         )
         r.raise_for_status()

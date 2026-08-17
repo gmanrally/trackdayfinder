@@ -1,0 +1,54 @@
+{% extends "_base.html" %}
+
+{% block title %}Contact the seller — {{ listing.circuit }} | TrackdayFinder.co.uk{% endblock %}
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; <a href="/spaces">Spaces</a> &rsaquo; Contact seller</nav>{% endblock %}
+
+{% block content %}
+<article class="page">
+  <div style="background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:26px 30px;box-shadow:var(--shadow-sm);max-width:640px">
+    {% if sent %}
+    <h1 style="margin-top:0">Message sent</h1>
+    <p>{{ confirmation }}</p>
+    <p style="color:var(--muted);font-size:13px">Their reply will come from their own
+      email address — keep an eye on spam just in case.</p>
+    <p style="margin-top:18px"><a class="book-btn" href="/spaces">← Back to the board</a></p>
+    {% else %}
+    <h1 style="margin-top:0">Contact {{ listing.seller_name or 'the seller' }}</h1>
+    <p class="lede" style="font-size:15px">
+      <strong>{{ listing.circuit }}</strong> — {{ listing.event_date.strftime('%a %d %b %Y') }}
+      {%- if listing.asking_price_gbp %} · Asking £{{ '%.0f' % listing.asking_price_gbp }}{% endif %}
+    </p>
+
+    {% if listing.transferable != 'yes' %}
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:13px;color:#92400e">
+      {% if listing.transferable == 'no' %}
+      The seller says the organiser <strong>doesn't allow name changes</strong> — check
+      with the organiser what that means for you before paying anything.
+      {% else %}
+      Transferability is <strong>unconfirmed</strong> — ask the seller, and confirm the
+      name change with the organiser before paying anything.
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:14px">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/spaces/contact/{{ listing.id }}">
+      <label style="display:block;font-size:12px;font-weight:600">Your message
+        <textarea name="message" rows="5" required maxlength="1000"
+                  placeholder="Hi — is the space still available? I'm interested…"
+                  style="display:block;width:100%;margin-top:5px;padding:9px 11px;font:14px 'Inter',system-ui,sans-serif;border:1px solid var(--line-2);border-radius:6px"></textarea>
+      </label>
+      <p style="font-size:12px;color:var(--muted);margin:10px 0 16px">
+        We'll email this to the seller. They reply straight to
+        <strong>{{ buyer.email }}</strong> — their address stays private unless they respond.
+      </p>
+      <button type="submit" class="book-btn" style="padding:11px 22px;font-size:14px;border:0;cursor:pointer">Send message →</button>
+      <a href="/spaces" style="margin-left:12px;font-size:13px">Cancel</a>
+    </form>
+    {% endif %}
+  </div>
+</article>
+{% endblock %}
