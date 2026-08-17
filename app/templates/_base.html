@@ -282,6 +282,15 @@
     box-shadow: var(--shadow-sm); white-space: nowrap;
   }
   .book-btn:hover { background: var(--accent-2); }
+  /* Marketplace: "space for sale" badge on a main-list row. */
+  .space-badge {
+    display: inline-block; margin-left: 6px; padding: 4px 9px;
+    background: #ecfdf5; color: #047857 !important;
+    border: 1px solid #a7f3d0; border-radius: 999px;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+    text-decoration: none !important;
+  }
+  .space-badge:hover { background: #d1fae5; border-color: #6ee7b7; }
   .book-btn:active { transform: translateY(1px); }
   tr.soldout .book-btn { background: var(--muted-2); }
   .pill {
@@ -443,6 +452,7 @@
     <a href="/{{ _q }}">Trackday list</a>
     <a href="/map{{ _q }}">Map</a>
     <a href="/calendar{{ _q }}">Calendar</a>
+    {% if marketplace_enabled %}<a href="/spaces" title="Trackday spaces for sale">Spaces</a>{% endif %}
     {% if alerts_enabled %}<a href="/alerts" title="Get email alerts when matching trackdays appear">Alerts</a>{% endif %}
   </nav>
   {% set _gm = global_meta() %}

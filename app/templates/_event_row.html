@@ -27,5 +27,11 @@
       <span class="pill" style="background:#fef3c7;color:#92400e">{{ e.stock_status }}</span>
     {%- endif -%}
   </td>
-  <td data-label="Book"><a class="book-btn" href="/go/{{ e.id }}" target="_blank" rel="noopener">Book →</a></td>
+  <td data-label="Book">
+    <a class="book-btn" href="/go/{{ e.id }}" target="_blank" rel="noopener">Book →</a>
+    {% if marketplace_enabled and e.id in (listing_event_ids or []) %}
+    <a class="space-badge" href="/spaces?circuit={{ e.circuit | urlencode }}"
+       title="Someone is selling their space for this trackday">Space for sale</a>
+    {% endif %}
+  </td>
 </tr>

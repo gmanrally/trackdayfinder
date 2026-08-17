@@ -100,6 +100,37 @@ class Click(SQLModel, table=True):
     user_agent: Optional[str] = None
 
 
+class Listing(SQLModel, table=True):
+    """A trackday space a seller can't use and wants to pass on. TrackdayFinder
+    is a noticeboard only — money + the organiser name-change happen between
+    buyer and seller. Lifecycle: pending (email unverified) → active →
+    sold / expired (event date passed)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    # What's for sale
+    circuit: str = Field(index=True)                 # canonical circuit name
+    event_date: date = Field(index=True)
+    organiser: Optional[str] = None                  # free text or display name
+    event_id: Optional[int] = Field(default=None, index=True)  # linked Event.id if matched
+    # Money
+    asking_price_gbp: Optional[float] = None
+    original_price_gbp: Optional[float] = None
+    currency: str = Field(default="GBP")
+    # The important caveat — can the organiser actually transfer the entry?
+    transferable: str = Field(default="unsure")      # "yes" | "no" | "unsure"
+    # Seller
+    seller_email: str = Field(index=True)
+    seller_name: Optional[str] = None
+    contact_method: str = Field(default="email")     # "email" | "phone" | "whatsapp"
+    contact_value: str = ""                           # shown only to logged-in buyers
+    note: Optional[str] = None
+    # Lifecycle
+    status: str = Field(default="pending", index=True)  # pending|active|sold|expired|removed
+    verify_token: str = Field(index=True)            # magic link to publish
+    manage_token: str = Field(index=True)            # seller self-manage (sold/delete)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    verified_at: Optional[datetime] = None
+
+
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
 

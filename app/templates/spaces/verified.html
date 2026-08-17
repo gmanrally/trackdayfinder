@@ -1,0 +1,17 @@
+{% extends "_base.html" %}
+{% block title %}Your space is live | TrackdayFinder.co.uk{% endblock %}
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; <a href="/spaces">Spaces</a> &rsaquo; Published</nav>{% endblock %}
+{% block content %}
+<article class="page">
+  <div style="background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:26px 30px;box-shadow:var(--shadow-sm);max-width:640px">
+    <h1 style="margin-top:0">Your space is live 🎉</h1>
+    <p><strong>{{ listing.circuit }}</strong> — {{ listing.event_date.strftime('%a %d %b %Y') }}</p>
+    <p>It's now on the board and anyone watching that circuit has been notified.
+       We've emailed you a link to mark it sold or remove it later.</p>
+    <p style="margin-top:18px">
+      <a class="book-btn" href="/spaces">See the board</a>
+      <a href="/spaces/manage/{{ listing.manage_token }}" style="margin-left:12px;font-size:13px">Manage this listing</a>
+    </p>
+  </div>
+</article>
+{% endblock %}

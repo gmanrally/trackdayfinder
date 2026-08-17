@@ -1,0 +1,22 @@
+{% extends "_base.html" %}
+{% block title %}Manage your listing | TrackdayFinder.co.uk{% endblock %}
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; <a href="/spaces">Spaces</a> &rsaquo; Manage</nav>{% endblock %}
+{% block content %}
+<article class="page">
+  <div style="background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:26px 30px;box-shadow:var(--shadow-sm);max-width:640px">
+    <h1 style="margin-top:0">Manage your listing</h1>
+    {% if saved %}
+    <div style="background:#ecfdf5;border:1px solid #a7f3d0;color:#047857;border-radius:8px;padding:10px 12px;margin:0 0 16px;font-size:14px">Saved.</div>
+    {% endif %}
+    <p><strong>{{ listing.circuit }}</strong> — {{ listing.event_date.strftime('%a %d %b %Y') }}<br>
+       Status: <strong>{{ listing.status | capitalize }}</strong></p>
+    <form method="post" action="/spaces/manage/{{ listing.manage_token }}" style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+      <button name="status" value="sold" class="book-btn" style="border:0;cursor:pointer;padding:10px 18px">Mark as sold</button>
+      <button name="status" value="removed" class="book-btn" style="border:0;cursor:pointer;padding:10px 18px;background:#64748b">Remove listing</button>
+      {% if listing.status != 'active' %}
+      <button name="status" value="active" class="book-btn" style="border:0;cursor:pointer;padding:10px 18px;background:#047857">Re-activate</button>
+      {% endif %}
+    </form>
+  </div>
+</article>
+{% endblock %}

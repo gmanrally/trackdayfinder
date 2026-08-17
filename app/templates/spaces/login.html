@@ -1,0 +1,26 @@
+{% extends "_base.html" %}
+{% block title %}Sign in to see seller contacts | TrackdayFinder.co.uk{% endblock %}
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; <a href="/spaces">Spaces</a> &rsaquo; Sign in</nav>{% endblock %}
+{% block content %}
+<article class="page">
+  <div style="background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:26px 30px;box-shadow:var(--shadow-sm);max-width:560px">
+    {% if sent %}
+    <h1 style="margin-top:0">Check your email</h1>
+    <p>We've sent a sign-in link to <strong>{{ email }}</strong>. Click it and you'll come straight back here.</p>
+    <p style="color:var(--muted);font-size:13px">Nothing after a few minutes? Check spam, or <a href="/spaces/login">try again</a>.</p>
+    {% else %}
+    <h1 style="margin-top:0">Sign in</h1>
+    <p class="lede" style="font-size:15px">No password needed. We email you a link — it keeps seller contact details away from spam bots.</p>
+    {% if error %}
+    <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:14px">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/spaces/login" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+      <input type="email" name="email" required placeholder="you@example.com"
+             style="flex:1 1 240px;padding:10px 12px;border:1px solid var(--line-2);border-radius:6px;font:14px 'Inter',system-ui,sans-serif">
+      <button type="submit" class="book-btn" style="border:0;cursor:pointer;padding:10px 20px;font-size:14px">Email me a link</button>
+    </form>
+    {% endif %}
+    <p style="margin-top:18px"><a href="/spaces">← Back to the board</a></p>
+  </div>
+</article>
+{% endblock %}

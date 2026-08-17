@@ -7,3 +7,8 @@ data/
 .vscode/
 .DS_Store
 *.log
+
+# Scratch HTML/JSON pulled down while investigating a scraper target.
+/*.html
+/*.json
+deploy/blog/*.zip

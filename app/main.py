@@ -20,6 +20,8 @@ CANONICAL_HOST = "https://trackdayfinder.co.uk"
 
 # Feature flags. Hidden from public unless explicitly enabled.
 ALERTS_ENABLED = os.environ.get("ALERTS_ENABLED", "").strip() == "1"
+# Trackday-space marketplace (noticeboard). Off until explicitly enabled.
+MARKETPLACE_ENABLED = os.environ.get("MARKETPLACE_ENABLED", "").strip() == "1"
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()
 # Umami analytics (self-hosted). Both env vars must be set for the tracking
 # tag to render. UMAMI_SRC is the script URL exposed by your Umami install
@@ -54,6 +56,7 @@ def _global_meta() -> dict:
 
 templates.env.globals["global_meta"] = _global_meta
 templates.env.globals["alerts_enabled"] = ALERTS_ENABLED
+templates.env.globals["marketplace_enabled"] = MARKETPLACE_ENABLED
 templates.env.globals["umami_src"] = UMAMI_SRC
 templates.env.globals["umami_website_id"] = UMAMI_WEBSITE_ID
 
@@ -401,6 +404,10 @@ async def _startup() -> None:
         digest_minute = int(os.environ.get("TRACKDAYFINDER_DIGEST_MINUTE", "0"))
         from . import alerts as _alerts
         scheduler.add_job(_alerts.run_digests, "cron", hour=digest_hour, minute=digest_minute, id="digests")
+    # Grey out marketplace listings whose event date has passed.
+    if MARKETPLACE_ENABLED:
+        from . import marketplace as _mkt
+        scheduler.add_job(_mkt.expire_past_listings, "cron", hour=2, minute=30, id="expire_listings")
     scheduler.start()
 
 
@@ -531,8 +538,15 @@ async def index(request: Request,
         months = _build_month_choices(all_events)
         last = s.exec(select(ScrapeRun).order_by(ScrapeRun.finished_at.desc())).first()
 
+    # Event ids that have a space for sale — badges the row on the main list.
+    listing_event_ids: set[int] = set()
+    if MARKETPLACE_ENABLED:
+        from . import marketplace as _mkt
+        listing_event_ids = _mkt.event_ids_with_listings()
+
     return templates.TemplateResponse(request, "index.html", {
         "events": events,
+        "listing_event_ids": listing_event_ids,
         "count": total_count,
         "total_count": total_count,
         "has_more": has_more,
@@ -621,7 +635,14 @@ async def index_chunk(request: Request,
             events = _drop_sessioned(events)
 
     tmpl = templates.env.get_template("_event_row.html")
-    html = "".join(tmpl.render(e=ev, request=request) for ev in events)
+    chunk_listing_ids: set[int] = set()
+    if MARKETPLACE_ENABLED:
+        from . import marketplace as _mkt
+        chunk_listing_ids = _mkt.event_ids_with_listings()
+    html = "".join(
+        tmpl.render(e=ev, request=request, listing_event_ids=chunk_listing_ids)
+        for ev in events
+    )
     return {
         "html": html,
         "has_more": has_more,
@@ -1239,6 +1260,215 @@ async def map_page(request: Request,
             "postcode": postcode, "radius_mi": radius_mi,
         },
     })
+
+
+# ============ Trackday-space marketplace ============
+
+BUYER_COOKIE = "tdf_buyer"
+
+
+def _buyer_from_request(request: Request):
+    """Return the logged-in buyer (User) from their cookie, or None."""
+    token = request.cookies.get(BUYER_COOKIE)
+    if not token:
+        return None
+    from .alerts import find_user_by_token
+    return find_user_by_token(token)
+
+
+@app.get("/spaces", response_class=HTMLResponse)
+async def spaces_board(request: Request, circuit: Optional[str] = None):
+    """Public noticeboard of trackday spaces for sale."""
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from . import marketplace as mkt
+    active = mkt.active_listings()
+    if circuit:
+        active = [l for l in active if l.circuit == circuit]
+    circuits = sorted({l.circuit for l in mkt.active_listings()})
+    return templates.TemplateResponse(request, "spaces/board.html", {
+        "listings": active,
+        "past": mkt.past_listings(),
+        "circuits": circuits,
+        "selected_circuit": circuit,
+        "buyer": _buyer_from_request(request),
+        "now_year": date.today().year,
+    })
+
+
+@app.get("/spaces/new", response_class=HTMLResponse)
+async def spaces_new(request: Request):
+    """Seller form."""
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    today = date.today()
+    with db_session() as s:
+        rows = s.exec(select(Event).where(Event.event_date >= today)).all()
+    circuits = sorted({e.circuit for e in rows})
+    return templates.TemplateResponse(request, "spaces/new.html", {
+        "circuits": circuits, "now_year": today.year, "error": None,
+    })
+
+
+@app.post("/spaces/new", response_class=HTMLResponse)
+async def spaces_create(request: Request):
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from . import marketplace as mkt
+    form = await request.form()
+
+    def _f(name: str) -> str:
+        return (form.get(name) or "").strip()
+
+    email = _f("seller_email").lower()
+    circuit = _f("circuit")
+    date_raw = _f("event_date")
+    contact_value = _f("contact_value")
+
+    errors = []
+    if "@" not in email or "." not in email:
+        errors.append("A valid email address is required.")
+    if not circuit:
+        errors.append("Pick the circuit.")
+    try:
+        event_date = date.fromisoformat(date_raw)
+    except ValueError:
+        event_date = None
+        errors.append("Pick a valid date.")
+    if event_date and event_date < date.today():
+        errors.append("That date has already passed.")
+    if not contact_value:
+        errors.append("Add how buyers should contact you.")
+
+    def _num(name: str) -> Optional[float]:
+        raw = _f(name).replace("£", "").replace(",", "")
+        try:
+            return float(raw) if raw else None
+        except ValueError:
+            return None
+
+    if errors:
+        today = date.today()
+        with db_session() as s:
+            rows = s.exec(select(Event).where(Event.event_date >= today)).all()
+        return templates.TemplateResponse(request, "spaces/new.html", {
+            "circuits": sorted({e.circuit for e in rows}),
+            "now_year": today.year,
+            "error": " ".join(errors),
+        }, status_code=400)
+
+    mkt.create_listing(
+        circuit=circuit,
+        event_date=event_date,
+        organiser=_f("organiser") or None,
+        asking_price_gbp=_num("asking_price_gbp"),
+        original_price_gbp=_num("original_price_gbp"),
+        transferable=_f("transferable") or "unsure",
+        seller_email=email,
+        seller_name=_f("seller_name") or None,
+        contact_method=_f("contact_method") or "email",
+        contact_value=contact_value,
+        note=_f("note") or None,
+    )
+    return templates.TemplateResponse(request, "spaces/submitted.html", {
+        "email": email, "now_year": date.today().year,
+    })
+
+
+@app.get("/spaces/verify/{token}", response_class=HTMLResponse)
+async def spaces_verify(request: Request, token: str):
+    """Seller clicks the emailed link — publishes the listing."""
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from . import marketplace as mkt
+    listing = mkt.verify_listing(token)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    return templates.TemplateResponse(request, "spaces/verified.html", {
+        "listing": listing, "now_year": date.today().year,
+    })
+
+
+@app.get("/spaces/manage/{token}", response_class=HTMLResponse)
+async def spaces_manage(request: Request, token: str):
+    """Seller self-manage page — mark sold / remove."""
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from .models import Listing
+    with db_session() as s:
+        listing = s.exec(select(Listing).where(Listing.manage_token == token)).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    return templates.TemplateResponse(request, "spaces/manage.html", {
+        "listing": listing, "now_year": date.today().year,
+    })
+
+
+@app.post("/spaces/manage/{token}", response_class=HTMLResponse)
+async def spaces_manage_post(request: Request, token: str):
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from . import marketplace as mkt
+    form = await request.form()
+    listing = mkt.set_status(token, (form.get("status") or "").strip())
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    return templates.TemplateResponse(request, "spaces/manage.html", {
+        "listing": listing, "now_year": date.today().year, "saved": True,
+    })
+
+
+@app.get("/spaces/login", response_class=HTMLResponse)
+async def spaces_login(request: Request):
+    """Buyer login — magic link so contact details stay off the public page."""
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    return templates.TemplateResponse(request, "spaces/login.html", {
+        "now_year": date.today().year, "sent": False,
+    })
+
+
+@app.post("/spaces/login", response_class=HTMLResponse)
+async def spaces_login_post(request: Request):
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import get_or_create_user, send_mail, CANONICAL_HOST
+    form = await request.form()
+    email = (form.get("email") or "").strip().lower()
+    if "@" not in email or "." not in email:
+        return templates.TemplateResponse(request, "spaces/login.html", {
+            "now_year": date.today().year, "sent": False,
+            "error": "Enter a valid email address.",
+        }, status_code=400)
+    user, _ = get_or_create_user(email)
+    link = f"{CANONICAL_HOST}/spaces/session/{user.token}"
+    send_mail(email, "Your TrackdayFinder sign-in link", f"""
+        <p>Click below to sign in and see seller contact details:</p>
+        <p><a href="{link}" style="background:#dc2626;color:#fff;padding:10px 18px;
+           border-radius:6px;text-decoration:none;font-weight:600">Sign in</a></p>
+        <p style="color:#94a3b8;font-size:12px">If you didn't request this, ignore it.</p>
+    """)
+    return templates.TemplateResponse(request, "spaces/login.html", {
+        "now_year": date.today().year, "sent": True, "email": email,
+    })
+
+
+@app.get("/spaces/session/{token}")
+async def spaces_session(request: Request, token: str):
+    """Consume the buyer magic link — set the cookie and go to the board."""
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from starlette.responses import RedirectResponse
+    from .alerts import find_user_by_token
+    user = find_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=404, detail="Invalid or expired link")
+    resp = RedirectResponse("/spaces", status_code=302)
+    resp.set_cookie(
+        BUYER_COOKIE, token, max_age=60 * 60 * 24 * 90,
+        httponly=True, samesite="lax", secure=True,
+    )
+    return resp
+
+
+@app.get("/spaces/logout")
+async def spaces_logout(request: Request):
+    if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
+    from starlette.responses import RedirectResponse
+    resp = RedirectResponse("/spaces", status_code=302)
+    resp.delete_cookie(BUYER_COOKIE)
+    return resp
 
 
 # ============ Email alerts ============

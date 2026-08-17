@@ -1,0 +1,14 @@
+{% extends "_base.html" %}
+{% block title %}Check your email | TrackdayFinder.co.uk{% endblock %}
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; <a href="/spaces">Spaces</a> &rsaquo; Almost done</nav>{% endblock %}
+{% block content %}
+<article class="page">
+  <div class="tdf-page" style="background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:26px 30px;box-shadow:var(--shadow-sm);max-width:640px">
+    <h1 style="margin-top:0">Almost done — check your email</h1>
+    <p>We've sent a link to <strong>{{ email }}</strong>. Click it to publish your space to the board.</p>
+    <p style="color:var(--muted);font-size:13px">Nothing arrived after a few minutes? Check spam, or
+      <a href="/spaces/new">try again</a>.</p>
+    <p style="margin-top:18px"><a class="book-btn" href="/spaces">Back to the board</a></p>
+  </div>
+</article>
+{% endblock %}
