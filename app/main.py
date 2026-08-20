@@ -22,6 +22,9 @@ CANONICAL_HOST = "https://trackdayfinder.co.uk"
 ALERTS_ENABLED = os.environ.get("ALERTS_ENABLED", "").strip() == "1"
 # Trackday-space marketplace (noticeboard). Off until explicitly enabled.
 MARKETPLACE_ENABLED = os.environ.get("MARKETPLACE_ENABLED", "").strip() == "1"
+# Marketplace opt-ins put manage/unsubscribe links in emails, so those routes
+# must work whenever either feature is live (signup stays alerts-only).
+ALERT_LINKS_ENABLED = ALERTS_ENABLED or MARKETPLACE_ENABLED
 ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()
 # Umami analytics (self-hosted). Both env vars must be set for the tracking
 # tag to render. UMAMI_SRC is the script URL exposed by your Umami install
@@ -404,6 +407,13 @@ async def _startup() -> None:
         digest_minute = int(os.environ.get("TRACKDAYFINDER_DIGEST_MINUTE", "0"))
         from . import alerts as _alerts
         scheduler.add_job(_alerts.run_digests, "cron", hour=digest_hour, minute=digest_minute, id="digests")
+        # Targeted availability re-scrape: hourly during waking hours, but only
+        # the sources that carry a watched upcoming event (no-op while nobody
+        # has confirmed watches). Urgent kinds mail immediately; "new event"
+        # alerts stay on the 06:00 digest. TRACKDAYFINDER_WATCH_REFRESH=0 disables.
+        if os.environ.get("TRACKDAYFINDER_WATCH_REFRESH", "1").strip() != "0":
+            scheduler.add_job(ingest.refresh_watched, "cron",
+                              hour="7-22", minute=15, id="watch_refresh")
     # Grey out marketplace listings whose event date has passed.
     if MARKETPLACE_ENABLED:
         from . import marketplace as _mkt
@@ -1361,6 +1371,7 @@ async def spaces_create(request: Request):
         seller_email=email,
         seller_name=_f("seller_name") or None,
         note=_f("note") or None,
+        alerts_opt_in=bool(_f("alerts_opt_in")),
     )
     return templates.TemplateResponse(request, "spaces/submitted.html", {
         "email": email, "now_year": date.today().year,
@@ -1442,9 +1453,21 @@ async def spaces_contact_post(request: Request, listing_id: int):
         raise HTTPException(status_code=404, detail="Listing not found")
     form = await request.form()
     ok, msg = mkt.send_intro(listing_id, buyer, form.get("message") or "")
+    # Opt-in: watch this circuit. Buyer's email is already proven (magic-link
+    # session), so the watch can go straight to confirmed.
+    watched = False
+    if ok and (form.get("watch_circuit") or "").strip():
+        from .alerts import add_watch, set_confirmed
+        try:
+            set_confirmed(buyer.id)
+            add_watch(buyer.id, "circuit", listing.circuit)
+            watched = True
+        except Exception:
+            pass
     return templates.TemplateResponse(request, "spaces/contact.html", {
         "listing": listing, "buyer": buyer, "now_year": date.today().year,
         "sent": ok, "error": None if ok else msg, "confirmation": msg if ok else None,
+        "watched": watched,
     }, status_code=200 if ok else 400)
 
 
@@ -1579,7 +1602,7 @@ async def alerts_submit(request: Request):
 
 @app.get("/alerts/confirm/{token}", response_class=HTMLResponse)
 async def alerts_confirm(request: Request, token: str):
-    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
     from .alerts import find_user_by_token
     user = find_user_by_token(token)
     if not user:
@@ -1595,7 +1618,7 @@ async def alerts_confirm(request: Request, token: str):
 
 @app.get("/alerts/manage/{token}", response_class=HTMLResponse)
 async def alerts_manage(request: Request, token: str):
-    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
     from .alerts import find_user_by_token
     user = find_user_by_token(token)
     if not user:
@@ -1617,7 +1640,7 @@ async def alerts_manage(request: Request, token: str):
 
 @app.post("/alerts/manage/{token}/remove/{watch_id}")
 async def alerts_remove_watch(request: Request, token: str, watch_id: int):
-    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
     from .alerts import find_user_by_token, remove_watch
     from starlette.responses import RedirectResponse
     user = find_user_by_token(token)
@@ -1629,7 +1652,7 @@ async def alerts_remove_watch(request: Request, token: str, watch_id: int):
 
 @app.get("/alerts/unsubscribe/{token}", response_class=HTMLResponse)
 async def alerts_unsubscribe(request: Request, token: str):
-    if not ALERTS_ENABLED: raise HTTPException(status_code=404)
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
     from .alerts import find_user_by_token
     user = find_user_by_token(token)
     if not user:

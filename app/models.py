@@ -122,6 +122,9 @@ class Listing(SQLModel, table=True):
     seller_email: str = Field(index=True)
     seller_name: Optional[str] = None
     note: Optional[str] = None
+    # Ticked "email me about this circuit" on the form; acted on at verify
+    # time (once the email is proven) by creating a confirmed User + Watch.
+    alerts_opt_in: bool = Field(default=False)
     # Lifecycle
     status: str = Field(default="pending", index=True)  # pending|active|sold|expired|removed
     verify_token: str = Field(index=True)            # magic link to publish

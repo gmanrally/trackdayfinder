@@ -14,7 +14,8 @@ from typing import Optional
 from sqlmodel import select
 
 from .models import Listing, Event, session as db_session
-from .alerts import send_mail, make_token, CANONICAL_HOST
+from .alerts import (send_mail, make_token, CANONICAL_HOST,
+                     get_or_create_user, add_watch, set_confirmed)
 
 MARKETPLACE_FROM_NOTE = (
     "TrackdayFinder is a noticeboard only — we are not party to the sale. "
@@ -35,9 +36,10 @@ def _match_event(circuit: str, event_date: date) -> Optional[int]:
 def create_listing(*, circuit: str, event_date: date, organiser: Optional[str],
                    asking_price_gbp: Optional[float], original_price_gbp: Optional[float],
                    transferable: str, seller_email: str, seller_name: Optional[str],
-                   note: Optional[str]) -> Listing:
+                   note: Optional[str], alerts_opt_in: bool = False) -> Listing:
     """Create a pending listing and email the seller a verify link."""
     listing = Listing(
+        alerts_opt_in=alerts_opt_in,
         circuit=circuit,
         event_date=event_date,
         organiser=organiser,
@@ -89,6 +91,15 @@ def verify_listing(token: str) -> Optional[Listing]:
             s.add(listing)
             s.commit()
             s.refresh(listing)
+            # Seller ticked the alerts opt-in on the form; the verify click
+            # has now proven the email, so the consent becomes actionable.
+            if listing.alerts_opt_in:
+                try:
+                    seller, _ = get_or_create_user(listing.seller_email)
+                    set_confirmed(seller.id)
+                    add_watch(seller.id, "circuit", listing.circuit)
+                except Exception:
+                    pass
         # Notify buyers watching this circuit (best-effort).
         try:
             _notify_watchers(listing)
@@ -256,14 +267,22 @@ def _notify_watchers(listing: Listing) -> None:
         if not user_ids:
             return
         users = s.exec(select(User).where(User.id.in_(user_ids), User.confirmed == True)).all()  # noqa: E712
+        # Don't tell the seller about their own listing (they may watch the
+        # circuit themselves via the form opt-in).
+        users = [u for u in users if u.email != listing.seller_email]
     board = f"{CANONICAL_HOST}/spaces"
     price = f"£{listing.asking_price_gbp:.0f}" if listing.asking_price_gbp else "—"
     for u in users:
+        manage = f"{CANONICAL_HOST}/alerts/manage/{u.token}"
+        unsub = f"{CANONICAL_HOST}/alerts/unsubscribe/{u.token}"
         html = f"""
         <p>A trackday space just came up at a circuit you're watching:</p>
         <p><strong>{listing.circuit}</strong> — {listing.event_date:%a %d %b %Y}<br>
            Asking: {price}</p>
         <p><a href="{board}">See it on the board →</a></p>
+        <hr style="margin-top:18px;border:0;border-top:1px solid #e2e8f0">
+        <p style="font-size:12px;color:#64748b">
+          <a href="{manage}">Manage your alerts</a> · <a href="{unsub}">Unsubscribe</a></p>
         """
         try:
             send_mail(u.email, f"Space for sale: {listing.circuit}", html)

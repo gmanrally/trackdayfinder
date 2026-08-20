@@ -33,6 +33,7 @@ def main(argv: list[str] | None = None) -> int:
     if not argv or argv[0] in ("-h", "--help"):
         print("usage:")
         print("  python -m app.cli refresh [source_slug]")
+        print("  python -m app.cli watch-refresh")
         print("  python -m app.cli audit-coords")
         print("sources:", ", ".join(SCRAPERS))
         return 0
@@ -59,6 +60,13 @@ def main(argv: list[str] | None = None) -> int:
         from . import alerts
         n = alerts.run_digests()
         print(f"sent {n} digest{'s' if n != 1 else ''}")
+        return 0
+    if cmd == "watch-refresh":
+        results = asyncio.run(ingest.refresh_watched())
+        if not results:
+            print("no confirmed watches on upcoming events — nothing to refresh")
+        for slug, (n, err) in results.items():
+            print(f"{slug}: {n} events" + (f" ERROR {err}" if err else ""))
         return 0
     print(f"unknown command '{cmd}'")
     return 2

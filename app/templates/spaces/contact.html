@@ -11,6 +11,10 @@
     <p>{{ confirmation }}</p>
     <p style="color:var(--muted);font-size:13px">Their reply will come from their own
       email address — keep an eye on spam just in case.</p>
+    {% if watched %}
+    <p style="color:var(--muted);font-size:13px">You're now getting alerts for
+      {{ listing.circuit }} — every email includes an unsubscribe link.</p>
+    {% endif %}
     <p style="margin-top:18px"><a class="book-btn" href="/spaces">← Back to the board</a></p>
     {% else %}
     <h1 style="margin-top:0">Contact {{ listing.seller_name or 'the seller' }}</h1>
@@ -45,6 +49,11 @@
         We'll email this to the seller. They reply straight to
         <strong>{{ buyer.email }}</strong> — their address stays private unless they respond.
       </p>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin:0 0 16px;font-size:13px">
+        <input type="checkbox" name="watch_circuit" value="1" style="margin-top:2px">
+        <span>Also email me alerts for {{ listing.circuit }} — new spaces for sale,
+          availability and price drops. Unsubscribe any time.</span>
+      </label>
       <button type="submit" class="book-btn" style="padding:11px 22px;font-size:14px;border:0;cursor:pointer">Send message →</button>
       <a href="/spaces" style="margin-left:12px;font-size:13px">Cancel</a>
     </form>

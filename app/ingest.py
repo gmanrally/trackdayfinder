@@ -175,6 +175,31 @@ async def run_one(slug: str) -> tuple[int, str | None]:
     return n, err
 
 
+# Virtual sources are emitted by a parent scraper via raw.source overrides —
+# map them back so a watched virtual source re-runs the right module.
+VIRTUAL_SOURCE_PARENT = {
+    "nurburgring_tf": "rsr_nurburg",
+    "destination_nurburgring": "rsr_nurburg",
+}
+
+
+async def refresh_watched() -> dict[str, tuple[int, str | None]]:
+    """Targeted refresh for alerts: re-scrape only the sources that have an
+    upcoming event some confirmed user watches, then send urgent-only
+    digests (availability + price — "new event" alerts stay on the daily
+    digest). No-op when nobody watches anything, so scheduling this hourly
+    costs nothing until the alert list has users."""
+    from .alerts import watched_sources, run_digests
+    slugs = {VIRTUAL_SOURCE_PARENT.get(s, s) for s in watched_sources()}
+    results: dict[str, tuple[int, str | None]] = {}
+    for slug in sorted(slugs):
+        if slug in SCRAPERS:
+            results[slug] = await run_one(slug)
+    if results:
+        run_digests(kinds={"price_drop", "reopened", "low_stock"})
+    return results
+
+
 async def run_all() -> dict[str, tuple[int, str | None]]:
     init_db()
     results: dict[str, tuple[int, str | None]] = {}

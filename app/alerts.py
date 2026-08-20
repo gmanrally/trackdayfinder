@@ -164,6 +164,37 @@ def find_user_by_token(token: str) -> Optional[User]:
         return s.exec(select(User).where(User.token == token)).first()
 
 
+def set_confirmed(user_id: int) -> None:
+    """Mark a user's email confirmed. Only call when ownership is already
+    proven — e.g. marketplace opt-ins behind a clicked magic link."""
+    with db_session() as s:
+        u = s.exec(select(User).where(User.id == user_id)).first()
+        if u and not u.confirmed:
+            u.confirmed = True
+            s.commit()
+
+
+def watched_sources() -> set[str]:
+    """Source slugs of upcoming events that at least one CONFIRMED user
+    watches — the target set for the frequent availability re-scrape.
+    Empty set = nobody's watching = the re-scrape can no-op."""
+    today = date.today()
+    with db_session() as s:
+        user_ids = [u.id for u in s.exec(
+            select(User).where(User.confirmed == True)).all()]  # noqa: E712
+        if not user_ids:
+            return set()
+        watches = s.exec(select(Watch).where(Watch.user_id.in_(user_ids))).all()
+        if not watches:
+            return set()
+        circuits = {w.value for w in watches if w.kind == "circuit"}
+        sources = {w.value for w in watches if w.kind == "source"}
+        event_ids = {int(w.value) for w in watches if w.kind == "event" and w.value.isdigit()}
+        events = s.exec(select(Event).where(Event.event_date >= today)).all()
+        return {e.source for e in events
+                if e.circuit in circuits or e.source in sources or e.id in event_ids}
+
+
 # ============ change detection ============
 
 def changes_for_user(user: User) -> dict[str, list[Event]]:
@@ -207,10 +238,13 @@ def changes_for_user(user: User) -> dict[str, list[Event]]:
             if len(snaps) < 2:
                 continue
             prev, curr = snaps[-2], snaps[-1]
-            # Price drop ≥ 5% (avoid noisy 1-quid jitter)
+            # Price drop ≥ 5% (avoid noisy 1-quid jitter). Dedup per price
+            # LEVEL, not per day — snapshots only append on change, so the
+            # same (prev, curr) pair would otherwise re-alert every run
+            # until the next unrelated change.
             if (prev.price_gbp and curr.price_gbp and
                     curr.price_gbp <= prev.price_gbp * 0.95 and
-                    (e.id, f"pd_{curr.captured_at:%Y%m%d}") not in already):
+                    (e.id, f"pd_{int(curr.price_gbp)}") not in already):
                 out["price_drop"].append(e)
             # Reopened: was sold out, now isn't
             if (prev.sold_out and not curr.sold_out and
@@ -274,7 +308,10 @@ def compose_digest(user: User, changes: dict) -> Optional[tuple[str, str]]:
         f"</p>"
     )
     n = sum(len(s[1]) for s in sections)
-    subject = f"TrackdayFinder digest — {n} update{'s' if n != 1 else ''}"
+    if changes["new"]:
+        subject = f"TrackdayFinder digest — {n} update{'s' if n != 1 else ''}"
+    else:
+        subject = f"TrackdayFinder availability alert — {n} update{'s' if n != 1 else ''}"
     return subject, "".join(body_parts)
 
 
@@ -286,19 +323,31 @@ def mark_sent(user_id: int, changes: dict) -> None:
             for e in events:
                 s.add(AlertSent(user_id=user_id, event_id=e.id, kind=kind))
         for e in changes["price_drop"]:
-            tag = f"pd_{datetime.utcnow():%Y%m%d}"
-            s.add(AlertSent(user_id=user_id, event_id=e.id, kind=tag))
+            # Tag from the latest SNAPSHOT price — the same value detection
+            # keyed on — so the dedup pair always matches.
+            snap = s.exec(select(EventSnapshot)
+                          .where(EventSnapshot.event_id == e.id)
+                          .order_by(EventSnapshot.captured_at.desc())).first()
+            price = (snap.price_gbp if snap and snap.price_gbp else e.price_gbp) or 0
+            s.add(AlertSent(user_id=user_id, event_id=e.id, kind=f"pd_{int(price)}"))
         s.commit()
 
 
-def run_digests() -> int:
+def run_digests(kinds: Optional[set] = None) -> int:
     """Send a digest to every confirmed user with any pending changes.
-    Returns the number of digests sent."""
+    `kinds` limits which change kinds are considered — the frequent
+    availability runs pass {"price_drop", "reopened", "low_stock"} so
+    "new event" alerts stay on the daily digest. None means all kinds.
+    Only full runs advance last_digest_at: it anchors the new-event
+    window, and an urgent-only send must not swallow events discovered
+    since the last full digest. Returns the number of digests sent."""
     sent = 0
     with db_session() as s:
         users = s.exec(select(User).where(User.confirmed == True)).all()  # noqa: E712
     for u in users:
         changes = changes_for_user(u)
+        if kinds is not None:
+            changes = {k: (v if k in kinds else []) for k, v in changes.items()}
         composed = compose_digest(u, changes)
         if not composed:
             continue
@@ -306,10 +355,11 @@ def run_digests() -> int:
         try:
             send_mail(u.email, subject, html)
             mark_sent(u.id, changes)
-            with db_session() as s:
-                u2 = s.exec(select(User).where(User.id == u.id)).first()
-                u2.last_digest_at = datetime.utcnow()
-                s.commit()
+            if kinds is None:
+                with db_session() as s:
+                    u2 = s.exec(select(User).where(User.id == u.id)).first()
+                    u2.last_digest_at = datetime.utcnow()
+                    s.commit()
             sent += 1
         except Exception as exc:
             print(f"[alerts] failed to send digest to {u.email}: {exc}")
