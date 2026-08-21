@@ -1,11 +1,12 @@
-{% extends "_base.html" %}
+﻿{% extends "_base.html" %}
+{% block body_class %}zone-alerts{% endblock %}
 
-{% block title %}Manage alerts — TrackdayFinder.co.uk{% endblock %}
+{% block title %}Manage alerts â€” TrackdayFinder.co.uk{% endblock %}
 
 {% block content %}
 <article class="page">
   <h1>Your alerts</h1>
-  <p class="lede">{{ user.email }} · {% if user.confirmed %}<span style="color:#0f766e">Confirmed</span>{% else %}<span style="color:#c2410c">Not yet confirmed</span>{% endif %}</p>
+  <p class="lede">{{ user.email }} Â· {% if user.confirmed %}<span style="color:#0f766e">Confirmed</span>{% else %}<span style="color:#c2410c">Not yet confirmed</span>{% endif %}</p>
 
   {% if watches %}
   <h2>Watching</h2>
@@ -31,9 +32,9 @@
   {% endif %}
 
   <h2 style="margin-top:28px">Add more</h2>
-  <p><a class="book-btn" href="/alerts">Watch more circuits or organisers →</a></p>
+  <p><a class="book-btn" href="/alerts">Watch more circuits or organisers â†’</a></p>
 
   <h2 style="margin-top:28px">Stop receiving alerts</h2>
-  <p><a href="/alerts/unsubscribe/{{ user.token }}" style="color:var(--muted)">Unsubscribe and remove all watches →</a></p>
+  <p><a href="/alerts/unsubscribe/{{ user.token }}" style="color:var(--muted)">Unsubscribe and remove all watches â†’</a></p>
 </article>
 {% endblock %}

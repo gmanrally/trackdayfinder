@@ -1,5 +1,6 @@
 {% extends "_base.html" %}
 
+{% block body_class %}zone-spaces{% endblock %}
 {% block title %}Trackday Spaces For Sale — UK & Europe | TrackdayFinder.co.uk{% endblock %}
 {% block meta_description %}Buy and sell last-minute trackday spaces. Drivers who can no longer make a booked trackday list their space here — browse by circuit and date.{% endblock %}
 
@@ -9,6 +10,7 @@
 <article class="page">
   <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;justify-content:space-between">
     <div>
+      <div class="zone-tag">Marketplace</div>
       <h1>Trackday spaces for sale</h1>
       <p class="lede">Booked a day you can no longer make? List it free. Looking for a last-minute space? Browse below.</p>
     </div>
@@ -35,45 +37,35 @@
   {% endif %}
 
   {% if listings %}
-  <div class="table-scroll">
-  <table>
-    <thead><tr>
-      <th>Date</th><th>Circuit</th><th>Organiser</th><th>Transferable</th>
-      <th class="right">Asking</th><th class="right">Was</th><th>Contact</th>
-    </tr></thead>
-    <tbody>
+  <div class="space-cards">
     {% for l in listings %}
-      <tr>
-        <td data-label="Date"><strong>{{ l.event_date.strftime('%a %d %b %Y') }}</strong></td>
-        <td data-label="Circuit"><a href="/circuit/{{ l.circuit | slugify }}">{{ l.circuit }}</a></td>
-        <td data-label="Organiser" {% if not l.organiser %}class="is-empty"{% endif %}>{{ l.organiser or '—' }}</td>
-        <td data-label="Transferable">
-          {%- if l.transferable == 'yes' -%}
-            <span class="pill" style="background:#ecfdf5;color:#047857">Yes</span>
-          {%- elif l.transferable == 'no' -%}
-            <span class="pill" style="background:#fef2f2;color:#b91c1c">No</span>
-          {%- else -%}
-            <span class="pill" style="background:#f1f5f9;color:#475569">Check</span>
-          {%- endif -%}
-        </td>
-        <td data-label="Asking" class="right">{{ '£%.0f' % l.asking_price_gbp if l.asking_price_gbp else '—' }}</td>
-        <td data-label="Was" class="right{% if not l.original_price_gbp %} is-empty{% endif %}">
-          {{ '£%.0f' % l.original_price_gbp if l.original_price_gbp else '' }}
-        </td>
-        <td data-label="Contact">
-          {% if buyer %}
-            <a class="book-btn" href="/spaces/contact/{{ l.id }}">Contact seller{% if l.seller_name %} ({{ l.seller_name }}){% endif %} →</a>
-          {% else %}
-            <a class="book-btn" href="/spaces/login">Sign in to contact</a>
-          {% endif %}
-        </td>
-      </tr>
-      {% if l.note %}
-      <tr><td colspan="7" style="padding-top:0;color:var(--muted);font-size:13px">{{ l.note }}</td></tr>
-      {% endif %}
+    <article class="space-card">
+      <div class="sc-top">
+        <span class="sc-date">{{ l.event_date.strftime('%a %d %b %Y') }}</span>
+        {%- if l.transferable == 'yes' -%}
+          <span class="pill" style="background:#ecfdf5;color:#047857">Transferable</span>
+        {%- elif l.transferable == 'no' -%}
+          <span class="pill" style="background:#fef2f2;color:#b91c1c">Not transferable</span>
+        {%- else -%}
+          <span class="pill" style="background:#f1f5f9;color:#475569">Check transfer</span>
+        {%- endif -%}
+      </div>
+      <h3><a href="/circuit/{{ l.circuit | slugify }}">{{ l.circuit }}</a></h3>
+      <div class="sc-org">{{ l.organiser or 'Organiser not stated' }}</div>
+      <div class="sc-price">
+        <strong>{{ '£%.0f' % l.asking_price_gbp if l.asking_price_gbp else 'Offers' }}</strong>
+        {% if l.original_price_gbp %}<s>£{{ '%.0f' % l.original_price_gbp }}</s>{% endif %}
+      </div>
+      {% if l.note %}<p class="sc-note">{{ l.note }}</p>{% endif %}
+      <div class="sc-cta">
+        {% if buyer %}
+          <a class="book-btn" href="/spaces/contact/{{ l.id }}">Contact {{ l.seller_name or 'seller' }} →</a>
+        {% else %}
+          <a class="book-btn" href="/spaces/login">Sign in to contact</a>
+        {% endif %}
+      </div>
+    </article>
     {% endfor %}
-    </tbody>
-  </table>
   </div>
   {% else %}
   <div class="empty">
@@ -107,4 +99,26 @@
   </div>
   {% endif %}
 </article>
+
+<style>
+  .space-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:14px; margin:0 0 8px; }
+  .space-card {
+    background:#fff; border:1px solid var(--line); border-top:3px solid var(--accent);
+    border-radius:var(--radius); padding:14px 16px 16px; box-shadow:var(--shadow-sm);
+    display:flex; flex-direction:column; gap:6px;
+    transition:box-shadow .15s, transform .15s;
+  }
+  .space-card:hover { box-shadow:var(--shadow); transform:translateY(-2px); }
+  .sc-top { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .sc-date { font-size:12px; font-weight:700; color:var(--accent-2); text-transform:uppercase; letter-spacing:.04em; }
+  .space-card h3 { margin:0; font-size:17px; }
+  .space-card h3 a { color:var(--fg); text-decoration:none; }
+  .space-card h3 a:hover { color:var(--accent); }
+  .sc-org { font-size:13px; color:var(--muted); }
+  .sc-price { font-size:15px; }
+  .sc-price strong { font-size:19px; }
+  .sc-price s { color:var(--muted-2); margin-left:6px; font-size:13px; }
+  .sc-note { margin:2px 0 0; font-size:13px; color:var(--muted); }
+  .sc-cta { margin-top:auto; padding-top:8px; }
+</style>
 {% endblock %}
