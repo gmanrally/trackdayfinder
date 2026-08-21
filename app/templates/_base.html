@@ -269,6 +269,10 @@
   tbody tr:hover td { background: var(--hi-bg); }
   tbody tr:last-child td { border-bottom: none; }
   tr.soldout td { opacity: 0.45; text-decoration: line-through; }
+  /* A sold-out day with a space for sale is still actionable — keep the
+     stock and book cells full-strength so the badge reads. */
+  tr.soldout.has-space td[data-label="Stock"],
+  tr.soldout.has-space td[data-label="Book"] { opacity: 1; text-decoration: none; }
   td.right { text-align: right; }
   /* Table cell links: subtle dark with red hover, not red-by-default. */
   td a { color: var(--fg); font-weight: 500; text-decoration: none; }
@@ -291,6 +295,9 @@
     text-decoration: none !important;
   }
   .space-badge:hover { background: #d1fae5; border-color: #6ee7b7; }
+  /* On a sold-out row the badge IS the story — flip it to solid green. */
+  tr.soldout .space-badge { background: #059669; color: #fff !important; border-color: #059669; }
+  tr.soldout .space-badge:hover { background: #047857; border-color: #047857; }
   .book-btn:active { transform: translateY(1px); }
   tr.soldout .book-btn { background: var(--muted-2); }
   .pill {

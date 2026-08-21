@@ -1,5 +1,6 @@
 {# Single <tr> for an event. Used by index.html and the /chunk endpoint. #}
-<tr class="{% if e.sold_out %}soldout{% endif %}" data-iso="{{ e.event_date.isoformat() }}">
+{% set has_space = marketplace_enabled and e.id in (listing_event_ids or []) %}
+<tr class="{% if e.sold_out %}soldout{% endif %}{% if has_space %} has-space{% endif %}" data-iso="{{ e.event_date.isoformat() }}">
   <td data-label="Date"><a href="/trackday/{{ e.source }}/{{ e.dedup_key }}">{{ e.event_date.strftime('%a %d %b %Y') }}</a></td>
   <td data-label="Circuit"><a href="/circuit/{{ e.circuit | slugify }}">{{ e.circuit }}</a></td>
   <td data-label="Session" {% if not e.session or e.session == 'day' %}class="is-empty"{% endif %}>{% if e.session and e.session != 'day' %}<span class="pill" style="background:#fef3c7;color:#92400e">{{ e.session }}</span>{% else %}<span style="color:var(--muted-2)">{{ e.session or '' }}</span>{% endif %}</td>
@@ -21,6 +22,8 @@
   <td data-label="Stock" {% if not (e.sold_out or e.spaces_left is not none or e.stock_status) %}class="is-empty"{% endif %}>
     {%- if e.sold_out -%}
       <span class="pill" style="background:#1f2937;color:#fff">Sold out</span>
+      {%- if has_space %} <a class="space-badge" href="/spaces?circuit={{ e.circuit | urlencode }}"
+         title="Someone is selling their space for this trackday">Space for sale</a>{% endif -%}
     {%- elif e.spaces_left is not none -%}
       <span class="pill" style="background:{% if e.spaces_left <= 3 %}#dc2626;color:#fff{% else %}#fef3c7;color:#92400e{% endif %}">{{ e.spaces_left }} left</span>
     {%- elif e.stock_status -%}
@@ -29,7 +32,7 @@
   </td>
   <td data-label="Book">
     <a class="book-btn" href="/go/{{ e.id }}" target="_blank" rel="noopener">Book →</a>
-    {% if marketplace_enabled and e.id in (listing_event_ids or []) %}
+    {% if has_space %}
     <a class="space-badge" href="/spaces?circuit={{ e.circuit | urlencode }}"
        title="Someone is selling their space for this trackday">Space for sale</a>
     {% endif %}
