@@ -83,6 +83,8 @@
     transition: background .15s, border-color .15s;
   }
   header nav.top-nav a:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.2); }
+  /* Current section lights up in the brand accent. */
+  header nav.top-nav a.active { background: var(--accent); border-color: var(--accent); color: #fff; }
   header .report-link {
     color: #fbbf24; text-decoration: none; font-size: 12px; font-weight: 600;
     padding: 5px 10px; border-radius: 6px;
@@ -298,27 +300,6 @@
   /* On a sold-out row the badge IS the story — flip it to solid green. */
   tr.soldout .space-badge { background: #059669; color: #fff !important; border-color: #059669; }
   tr.soldout .space-badge:hover { background: #047857; border-color: #047857; }
-
-  /* ===== Section zones ====================================================
-     Spaces (marketplace) and Alerts are the community layer, not the data
-     directory — each gets its own accent + page wash so the switch of
-     context is felt. Everything keyed off --accent / --hi-bg re-skins
-     automatically; the dark header stays for brand continuity, with the
-     active nav pill lit in the section colour. */
-  body.zone-spaces { --accent:#059669; --accent-2:#047857; --hi-bg:#ecfdf5; background:#f2faf6; }
-  body.zone-alerts { --accent:#4f46e5; --accent-2:#4338ca; --hi-bg:#eef2ff; background:#f5f6fe; }
-  body.zone-spaces header nav.top-nav a[href="/spaces"],
-  body.zone-alerts header nav.top-nav a[href="/alerts"] {
-    background: var(--accent); border-color: var(--accent); color: #fff;
-  }
-  .zone-tag {
-    display: inline-block; margin: 0 0 6px; padding: 3px 10px;
-    background: var(--hi-bg); color: var(--accent-2);
-    border: 1px solid var(--line-2); border-radius: 999px;
-    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
-  }
-  body.zone-spaces .zone-tag { border-color: #a7f3d0; }
-  body.zone-alerts .zone-tag { border-color: #c7d2fe; }
   .book-btn:active { transform: translateY(1px); }
   tr.soldout .book-btn { background: var(--muted-2); }
   .pill {
@@ -463,7 +444,7 @@
   gtag('config', 'G-73PF9R6CT0');
 </script>
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body>
 
 <header>
   <div class="brand-block">
@@ -476,12 +457,13 @@
   </div>
   {% set _qs = request.url.query %}
   {% set _q = ('?' ~ _qs) if _qs else '' %}
+  {% set _p = request.url.path %}
   <nav class="top-nav">
-    <a href="/{{ _q }}">Trackday list</a>
-    <a href="/map{{ _q }}">Map</a>
-    <a href="/calendar{{ _q }}">Calendar</a>
-    {% if marketplace_enabled %}<a href="/spaces" title="Trackday spaces for sale">Spaces</a>{% endif %}
-    {% if alerts_enabled %}<a href="/alerts" title="Get email alerts when matching trackdays appear">Alerts</a>{% endif %}
+    <a href="/{{ _q }}" class="{{ 'active' if _p == '/' else '' }}">Trackday list</a>
+    <a href="/map{{ _q }}" class="{{ 'active' if _p.startswith('/map') else '' }}">Map</a>
+    <a href="/calendar{{ _q }}" class="{{ 'active' if _p.startswith('/calendar') else '' }}">Calendar</a>
+    {% if marketplace_enabled %}<a href="/spaces" class="{{ 'active' if _p.startswith('/spaces') else '' }}" title="Trackday spaces for sale">Spaces</a>{% endif %}
+    {% if alerts_enabled %}<a href="/alerts" class="{{ 'active' if _p.startswith('/alerts') else '' }}" title="Get email alerts when matching trackdays appear">Alerts</a>{% endif %}
   </nav>
   {% set _gm = global_meta() %}
   <span class="meta">{{ _gm.count }} events · last refresh {{ _gm.last_run or "never" }}</span>
