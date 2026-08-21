@@ -1312,9 +1312,10 @@ async def spaces_new(request: Request):
     today = date.today()
     with db_session() as s:
         rows = s.exec(select(Event).where(Event.event_date >= today)).all()
-    circuits = sorted({e.circuit for e in rows})
     return templates.TemplateResponse(request, "spaces/new.html", {
-        "circuits": circuits, "now_year": today.year, "error": None,
+        "circuits": sorted({e.circuit for e in rows}),
+        "organisers": sorted({e.organiser for e in rows}),
+        "now_year": today.year, "error": None,
     })
 
 
@@ -1330,6 +1331,17 @@ async def spaces_create(request: Request):
     email = _f("seller_email").lower()
     circuit = _f("circuit")
     date_raw = _f("event_date")
+
+    today = date.today()
+    with db_session() as s:
+        rows = s.exec(select(Event).where(Event.event_date >= today)).all()
+    circuits = sorted({e.circuit for e in rows})
+    organisers = sorted({e.organiser for e in rows})
+
+    # Organiser is a closed list — anything else (tampered POST) drops to None.
+    organiser = _f("organiser")
+    if organiser not in organisers:
+        organiser = None
 
     errors = []
     if "@" not in email or "." not in email:
@@ -1352,11 +1364,9 @@ async def spaces_create(request: Request):
             return None
 
     if errors:
-        today = date.today()
-        with db_session() as s:
-            rows = s.exec(select(Event).where(Event.event_date >= today)).all()
         return templates.TemplateResponse(request, "spaces/new.html", {
-            "circuits": sorted({e.circuit for e in rows}),
+            "circuits": circuits,
+            "organisers": organisers,
             "now_year": today.year,
             "error": " ".join(errors),
         }, status_code=400)
@@ -1364,7 +1374,7 @@ async def spaces_create(request: Request):
     mkt.create_listing(
         circuit=circuit,
         event_date=event_date,
-        organiser=_f("organiser") or None,
+        organiser=organiser,
         asking_price_gbp=_num("asking_price_gbp"),
         original_price_gbp=_num("original_price_gbp"),
         transferable=_f("transferable") or "unsure",
