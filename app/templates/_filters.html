@@ -290,6 +290,7 @@
   </label>
   <label>Max £ <input type="number" name="max_price" value="{{ filters.max_price or '' }}" style="width:80px"></label>
   <label><input type="checkbox" name="hide_sold_out" {% if filters.hide_sold_out %}checked{% endif %}> Hide sold out</label>
+  <label title="Only organisers with a published EV policy (allowed, or allowed with conditions), excluding circuits that ban EVs. Always confirm with the organiser."><input type="checkbox" name="ev_ok" {% if filters.ev_ok %}checked{% endif %}> EV friendly</label>
   <label><input type="checkbox" name="hide_sessioned" {% if filters.hide_sessioned %}checked{% endif %}> Hide sessioned</label>
   <button type="button" id="clear-filters" class="btn-clear">Clear filters</button>
 </form>

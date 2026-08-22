@@ -60,6 +60,9 @@ def _global_meta() -> dict:
 templates.env.globals["global_meta"] = _global_meta
 templates.env.globals["alerts_enabled"] = ALERTS_ENABLED
 templates.env.globals["marketplace_enabled"] = MARKETPLACE_ENABLED
+from .ev_policy import ev_status as _ev_status, CHECKED as _EV_CHECKED  # noqa: E402
+templates.env.globals["ev_status"] = _ev_status
+templates.env.globals["ev_checked"] = _EV_CHECKED
 templates.env.globals["umami_src"] = UMAMI_SRC
 templates.env.globals["umami_website_id"] = UMAMI_WEBSITE_ID
 
@@ -294,7 +297,7 @@ def _multi(request: Request, name: str) -> list[str]:
 
 def _filtered_events_query(circuit, vehicle, source, session,
                            from_, to, max_price, hide_sold_out, sort,
-                           weekdays=None, month=None):
+                           weekdays=None, month=None, ev_ok=None):
     """Build a select(Event) with all user filters + the chosen sort applied.
     Returns (query, sort_key) — caller handles execution.
 
@@ -343,6 +346,13 @@ def _filtered_events_query(circuit, vehicle, source, session,
         except ValueError: pass
     if hide_sold_out:
         q = q.where(Event.sold_out == False)  # noqa: E712
+    if ev_ok:
+        # Positive-knowledge filter: only organisers with a published
+        # allowed/with-conditions EV policy, minus circuits that ban EVs
+        # outright. Silence never counts as EV-friendly.
+        from .ev_policy import EV_OK_SOURCES, BANNED_CIRCUITS
+        q = q.where(Event.source.in_(EV_OK_SOURCES),
+                    Event.circuit.not_in(BANNED_CIRCUITS))
     # Month — accept "YYYY-MM" string or list of them. OR them together.
     months_list = _aslist(month)
     if months_list:
@@ -437,7 +447,8 @@ async def index(request: Request,
                 postcode: Optional[str] = None,
                 radius_mi: Optional[str] = None,
                 country: Optional[str] = None,
-                hide_sessioned: Optional[str] = None):
+                hide_sessioned: Optional[str] = None,
+                ev_ok: Optional[str] = None):
     weekdays = request.query_params.getlist("weekdays")
     circuits_sel  = _multi(request, "circuit")
     sources_sel   = _multi(request, "source")
@@ -461,13 +472,13 @@ async def index(request: Request,
     with db_session() as s:
         q, sort_key = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                              from_, to, max_price, hide_sold_out, sort,
-                                             weekdays=weekdays, month=months_sel)
+                                             weekdays=weekdays, month=months_sel, ev_ok=ev_ok)
         # If the user is actively filtering, skip the rolling 30-day window
         # so they don't get a misleading "0 results" when matching events
         # exist further in the future.
         any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
                           or vehicle or from_ or to or weekdays or geo_active
-                          or countries_sel or hide_sess)
+                          or countries_sel or hide_sess or ev_ok)
         if any_filter:
             windowed = q
             has_more = False
@@ -578,6 +589,7 @@ async def index(request: Request,
             "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "ev_ok": bool(ev_ok),
             "hide_sessioned": hide_sess,
             "weekdays": list(weekdays),
             "postcode": postcode, "radius_mi": radius_mi,
@@ -601,7 +613,8 @@ async def index_chunk(request: Request,
                       postcode: Optional[str] = None,
                       radius_mi: Optional[str] = None,
                       country: Optional[str] = None,
-                      hide_sessioned: Optional[str] = None):
+                      hide_sessioned: Optional[str] = None,
+                      ev_ok: Optional[str] = None):
     """Returns rendered <tr>s for the next 30-day window, plus a has_more flag.
     Used by the index page's infinite-scroll JS."""
     weekdays = request.query_params.getlist("weekdays")
@@ -625,10 +638,10 @@ async def index_chunk(request: Request,
     with db_session() as s:
         q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort,
-                                      weekdays=weekdays, month=months_sel)
+                                      weekdays=weekdays, month=months_sel, ev_ok=ev_ok)
         any_filter = bool(circuits_sel or sources_sel or sessions_sel or months_sel
                           or vehicle or from_ or to or weekdays or geo_active
-                          or countries_sel or hide_sess)
+                          or countries_sel or hide_sess or ev_ok)
         if any_filter:
             events = s.exec(q).all()
             has_more = False
@@ -973,7 +986,8 @@ async def calendar_page(request: Request,
                         postcode: Optional[str] = None,
                         radius_mi: Optional[str] = None,
                         country: Optional[str] = None,
-                        hide_sessioned: Optional[str] = None):
+                        hide_sessioned: Optional[str] = None,
+                        ev_ok: Optional[str] = None):
     """Month-grid calendar view of all upcoming events. Same filters as index."""
     from .scrapers import ORGANISER_DISPLAY, SOURCE_REGION
     from .circuit_countries import CIRCUIT_COUNTRY
@@ -997,7 +1011,7 @@ async def calendar_page(request: Request,
     with db_session() as s:
         q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort=None,
-                                      weekdays=weekdays, month=months_sel)
+                                      weekdays=weekdays, month=months_sel, ev_ok=ev_ok)
         events = s.exec(q).all()
         if origin is not None:
             events = _within_radius(events, origin, radius_value)
@@ -1078,6 +1092,7 @@ async def calendar_page(request: Request,
             "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "ev_ok": bool(ev_ok),
             "hide_sessioned": hide_sess,
             "weekdays": list(weekdays),
             "postcode": postcode, "radius_mi": radius_mi,
@@ -1099,7 +1114,8 @@ async def map_page(request: Request,
                    postcode: Optional[str] = None,
                    radius_mi: Optional[str] = None,
                    country: Optional[str] = None,
-                   hide_sessioned: Optional[str] = None):
+                   hide_sessioned: Optional[str] = None,
+                   ev_ok: Optional[str] = None):
     """Interactive map of UK + EU circuits with upcoming events.
     Honours the same filter set as the index calendar."""
     from collections import Counter
@@ -1118,7 +1134,7 @@ async def map_page(request: Request,
     with db_session() as s:
         q, _ = _filtered_events_query(circuits_sel, vehicle, sources_sel, sessions_sel,
                                       from_, to, max_price, hide_sold_out, sort=None,
-                                      weekdays=weekdays, month=months_sel)
+                                      weekdays=weekdays, month=months_sel, ev_ok=ev_ok)
         events = s.exec(q).all()
         if origin is not None:
             events = _within_radius(events, origin, radius_value)
@@ -1265,6 +1281,7 @@ async def map_page(request: Request,
             "vehicle": vehicle,
             "from_": from_, "to": to, "max_price": max_price,
             "hide_sold_out": bool(hide_sold_out),
+            "ev_ok": bool(ev_ok),
             "hide_sessioned": hide_sess,
             "weekdays": list(weekdays),
             "postcode": postcode, "radius_mi": radius_mi,

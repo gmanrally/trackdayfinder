@@ -35,6 +35,20 @@
 
   {% if e.notes %}<p style="color:var(--muted);font-style:italic">{{ e.notes }}</p>{% endif %}
 
+  {%- set _ev = ev_status(e.source, e.circuit) -%}
+  {% if _ev %}
+  <div style="border-radius:8px;padding:10px 14px;margin:12px 0;font-size:13px;max-width:640px;
+    {% if _ev.status == 'banned' %}background:#fef2f2;border:1px solid #fecaca;color:#b91c1c
+    {% elif _ev.status == 'allowed' %}background:#ecfdf5;border:1px solid #a7f3d0;color:#047857
+    {% else %}background:#fef3c7;border:1px solid #fde68a;color:#92400e{% endif %}">
+    <strong>Electric vehicles:
+      {% if _ev.status == 'banned' %}not allowed{% elif _ev.status == 'allowed' %}allowed{% else %}allowed with conditions{% endif %}.</strong>
+    {{ _ev.note }}.
+    <a href="{{ _ev.url }}" target="_blank" rel="noopener" style="color:inherit">Source</a>
+    (checked {{ ev_checked }}) — policies change, always confirm with the organiser.
+  </div>
+  {% endif %}
+
   <h2>Get an email alert for this event</h2>
   <p style="color:var(--muted);font-size:13px">We'll email you if the price drops, it sells out, becomes available again, or is running low on space.</p>
   <form method="post" action="/alerts" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;max-width:520px">

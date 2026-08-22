@@ -6,7 +6,12 @@
   <td data-label="Session" {% if not e.session or e.session == 'day' %}class="is-empty"{% endif %}>{% if e.session and e.session != 'day' %}<span class="pill" style="background:#fef3c7;color:#92400e">{{ e.session }}</span>{% else %}<span style="color:var(--muted-2)">{{ e.session or '' }}</span>{% endif %}</td>
   <td data-label="Organiser"><a href="/organiser/{{ e.source }}">{{ e.organiser }}</a></td>
   <td data-label="Title">{{ e.title or '' }}{% if e.is_package %} <span class="pill" style="background:#dbeafe;color:#1e40af">package</span>{% endif %}</td>
-  <td data-label="Vehicle" {% if not e.vehicle_type %}class="is-empty"{% endif %}>{{ e.vehicle_type or '' }}</td>
+  <td data-label="Vehicle" {% if not e.vehicle_type %}class="is-empty"{% endif %}>{{ e.vehicle_type or '' }}
+    {%- set _ev = ev_status(e.source, e.circuit) -%}
+    {%- if _ev %} <span class="pill" title="{{ _ev.note }} (checked {{ ev_checked }} — confirm with organiser)"
+      style="{% if _ev.status == 'banned' %}background:#fef2f2;color:#b91c1c{% elif _ev.status == 'allowed' %}background:#ecfdf5;color:#047857{% else %}background:#fef3c7;color:#92400e{% endif %}"
+      >{% if _ev.status == 'banned' %}No EVs{% elif _ev.status == 'allowed' %}EV OK{% else %}EV OK*{% endif %}</span>{% endif -%}
+  </td>
   <td data-label="Group" {% if not e.group_level %}class="is-empty"{% endif %}>{{ e.group_level or '' }}</td>
   <td data-label="Noise" {% if not e.noise_limit_db %}class="is-empty"{% endif %}>{{ e.noise_limit_db ~ ' dB' if e.noise_limit_db else '' }}</td>
   <td data-label="Price" class="right{% if not e.price_gbp %} is-empty{% endif %}">
