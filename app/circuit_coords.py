@@ -11,14 +11,14 @@ Anything not listed here just won't appear as a marker (the table still does).
 EXTERNAL_CIRCUITS: set[str] = {
     # Known active trackday venues with no scrapeable public calendar.
     # Add more as we encounter them; popup sends users to CIRCUIT_WEBSITES[name].
-    "Mondello Park",     # Checkfront widget per discipline; can't reliably scrape
+    # (Mondello Park used to live here — its own site books via an unscrapeable
+    # Checkfront widget — but events now arrive via the trackdays_ie scraper.)
     "Bishopscourt",      # NI bike circuit, runs days via clubs, no public feed
 }
 
 # Region tagging for external venues — used so the map's red "?" markers
 # respect a UK/EU region filter even when there are no scraped events.
 EXTERNAL_REGION: dict[str, str] = {
-    "Mondello Park": "UK",   # RoI but treated as UK-area for trackday context
     "Bishopscourt":  "UK",
 }
 

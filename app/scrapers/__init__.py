@@ -6,6 +6,7 @@ from . import (
     pembrey, llandow, kirkistown,
     trackday_solutions, curbstone, lotus_on_track, df_trackdays, skylimit, europa,
     three_sisters, castle_combe, paddock_gt, ventrax, ollies_secret,
+    trackdays_ie,
 )
 
 SCRAPERS = {
@@ -39,6 +40,7 @@ SCRAPERS = {
     "paddock_gt": paddock_gt,
     "ventrax": ventrax,
     "ollies_secret": ollies_secret,
+    "trackdays_ie": trackdays_ie,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -75,6 +77,7 @@ ORGANISER_DISPLAY = {
     "paddock_gt": "Paddock GT Club",
     "ventrax": "Ventrax Motorsport",
     "ollies_secret": "Ollie's Secret Track Days",
+    "trackdays_ie": "Trackdays.ie",
 }
 
 # Region grouping for the dropdown (UK first, EU after).
@@ -102,4 +105,5 @@ SOURCE_REGION = {
     "ventrax": "UK",
     "ollies_secret": "UK",
     "kirkistown": "UK",
+    "trackdays_ie": "UK",   # RoI — grouped with UK, same as the Mondello circuit mapping
 }
