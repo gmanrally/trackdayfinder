@@ -36,8 +36,10 @@
 
 {% if events %}
 {% if view == 'cards' %}
-<div id="results-list" class="event-cards">
+<div style="padding:14px 24px 0">
+<div id="results-list" class="space-cards">
   {% for e in events %}{% include "_event_card.html" %}{% endfor %}
+</div>
 </div>
 {% if has_more %}
 <div id="load-more" data-from="{{ next_from }}"
