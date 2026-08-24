@@ -28,6 +28,9 @@
 <link rel="icon" type="image/svg+xml" href="/static/logo-square.svg">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon-192.png">
 <link rel="shortcut icon" href="/favicon.ico">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-title" content="TrackdayFinder">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -493,7 +496,7 @@
   {% set _q = ('?' ~ _qs) if _qs else '' %}
   {% set _p = request.url.path %}
   <nav class="top-nav">
-    <a href="/{{ _q }}" class="{{ 'active' if _p == '/' else '' }}">Trackday list</a>
+    <a href="/{{ _q }}" class="{{ 'active' if _p == '/' else '' }}">List</a>
     <a href="/map{{ _q }}" class="{{ 'active' if _p.startswith('/map') else '' }}">Map</a>
     <a href="/calendar{{ _q }}" class="{{ 'active' if _p.startswith('/calendar') else '' }}">Calendar</a>
     {% if marketplace_enabled %}<a href="/spaces" class="{{ 'active' if _p.startswith('/spaces') else '' }}" title="Trackday spaces for sale">Spaces</a>{% endif %}
@@ -544,6 +547,28 @@
   "logo": "{{ canonical_host }}/static/favicon-512.png",
   "sameAs": ["https://gmracing.co.uk/"]
 }
+</script>
+<script>
+  // PWA: register the service worker; surface an "Install app" chip in the
+  // nav only when the browser says the site qualifies (beforeinstallprompt).
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(function () {});
+  }
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault();
+    var nav = document.querySelector('header nav.top-nav');
+    if (!nav || document.getElementById('install-app')) return;
+    var a = document.createElement('a');
+    a.id = 'install-app';
+    a.href = '#';
+    a.textContent = 'Install app';
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      e.prompt();
+      a.remove();
+    });
+    nav.appendChild(a);
+  });
 </script>
 </body>
 </html>
