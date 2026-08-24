@@ -1,13 +1,20 @@
-"""No Limits Trackdays — https://www.nolimitstrackdays.com/events-list.html
+"""No Limits Trackdays — https://www.nolimitstrackdays.com/uk-track-days
 
-UK-only bike trackdays. Each .product-range is a date group:
-  .date-container .date  -> "Monday - 04/05/2026"
-  .product-list .product -> one per circuit on that date, with:
-      .track-name        -> "Donington Park"
-      .name              -> "Standard Track Day"
-      .description       -> "3 Groups noise level Quiet 98db."
-      .price             -> "£239.00"
-      .actions a         -> book URL
+UK bike trackdays. The 2026-07 site redesign replaced /events-list.html
+(.product-range groups) with a JS-rendered card list; the old track-page
+URLs (/uk-tracks/donington.html?from=...) now 301 to the tracks index,
+which is what broke deep-linking for over a month (scraper returned 0
+events; stale July rows kept showing with dead links).
+
+Each event is one <a class="uk-event-card" href="/donington-park-august-27-2026">
+with the deep link right on the card:
+  data-circuit          -> "Brands Hatch Indy"
+  .card-date            -> "Tue 25 Aug 2026"
+  .card-name            -> "Brands Hatch Indy - August 25, 2026"
+  .card-desc            -> "4 Groups noise level 102db static."
+  .card-price           -> "£159.00 / per person"
+  .uk-group-chips .uk-chip{ available | limited-spaces | almost-sold-out | soldout }
+                        -> per-group availability; sold out = every chip soldout
 """
 from __future__ import annotations
 import re
@@ -19,68 +26,73 @@ from ._base import RawEvent, get_html_js
 
 SOURCE_SLUG = "nolimits"
 ORGANISER = "No Limits Trackdays"
-LISTING_URL = "https://www.nolimitstrackdays.com/events-list.html/"
+BASE_URL = "https://www.nolimitstrackdays.com"
+LISTING_URL = f"{BASE_URL}/uk-track-days"
 DEBUG_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "debug"
 
-DATE_RE = re.compile(r"(\d{1,2})/(\d{1,2})/(\d{4})")
 PRICE_RE = re.compile(r"([\d,]+(?:\.\d+)?)")
 
 
 async def fetch() -> list[RawEvent]:
     DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-    tree = await get_html_js(LISTING_URL, wait_selector=".product-range")
+    tree = await get_html_js(LISTING_URL, wait_selector=".uk-event-card")
     (DEBUG_DIR / "nolimits.html").write_text(tree.html or "", encoding="utf-8", errors="ignore")
 
     out: list[RawEvent] = []
-    for group in tree.css(".product-range"):
-        date_text = group.css_first(".date").text(strip=True) if group.css_first(".date") else ""
-        m = DATE_RE.search(date_text)
-        if not m:
-            continue
-        try:
-            event_date = datetime.strptime(f"{m.group(1)}/{m.group(2)}/{m.group(3)}", "%d/%m/%Y").date()
-        except ValueError:
-            continue
-        for prod in group.css(".product"):
-            ev = _parse(prod, event_date)
-            if ev:
-                out.append(ev)
+    for card in tree.css(".uk-event-card"):
+        ev = _parse(card)
+        if ev:
+            out.append(ev)
     return out
 
 
-def _parse(prod: Node, event_date) -> Optional[RawEvent]:
-    track = prod.css_first(".track-name")
-    if not track:
+def _parse(card: Node) -> Optional[RawEvent]:
+    href = (card.attributes.get("href") or "").strip()
+    if not href:
         return None
-    circuit_raw = track.text(strip=True)
+    booking_url = href if href.startswith("http") else BASE_URL + href
 
-    name_node = prod.css_first(".name")
+    date_node = card.css_first(".card-date")
+    if not date_node:
+        return None
+    try:
+        event_date = datetime.strptime(date_node.text(strip=True), "%a %d %b %Y").date()
+    except ValueError:
+        return None
+
+    circuit_raw = (card.attributes.get("data-circuit") or "").strip()
+    if not circuit_raw:
+        cnode = card.css_first(".card-circuit")
+        circuit_raw = cnode.text(strip=True).lstrip("📍").strip() if cnode else ""
+    if not circuit_raw:
+        return None
+
+    name_node = card.css_first(".card-name")
     title = name_node.text(strip=True) if name_node else circuit_raw
 
-    desc_node = prod.css_first(".description")
+    desc_node = card.css_first(".card-desc")
     desc = desc_node.text(separator=" ", strip=True) if desc_node else None
 
-    price_node = prod.css_first(".price")
     price_text = None
+    price_node = card.css_first(".card-price")
     if price_node:
         pm = PRICE_RE.search(price_node.text(strip=True).replace(",", ""))
         if pm:
             price_text = f"£{pm.group(1)}"
 
-    book = prod.css_first(".actions a")
-    href = book.attributes.get("href", LISTING_URL) if book else LISTING_URL
-
-    sold_out = bool(prod.css_first(".sold-out, .out-of-stock"))
-    sku = None
-    if href and "from=" in href:
-        sku = href.split("from=")[-1].split("&")[0]
+    chips = card.css(".uk-group-chips .uk-chip")
+    sold_out = bool(chips) and all("soldout" in (c.attributes.get("class") or "") for c in chips)
+    low = (not sold_out) and any(
+        ("almost-sold-out" in (c.attributes.get("class") or "")
+         or "limited-spaces" in (c.attributes.get("class") or "")) for c in chips)
 
     return RawEvent(
         source=SOURCE_SLUG, organiser=ORGANISER,
-        circuit_raw=circuit_raw, event_date=event_date, booking_url=href,
-        title=f"{title} — {circuit_raw}", price_text=price_text, noise_text=desc,
+        circuit_raw=circuit_raw, event_date=event_date, booking_url=booking_url,
+        title=title, price_text=price_text, noise_text=desc,
         notes=desc, vehicle_type="bike",
         sold_out=sold_out, spaces_left=0 if sold_out else None,
-        stock_status="Sold Out" if sold_out else None,
-        session="day", external_id=f"{circuit_raw}|{sku}" if sku else f"{circuit_raw}|{event_date}",
+        stock_status="Sold Out" if sold_out else ("Low Stock" if low else None),
+        session="evening" if "evening" in href.lower() else "day",
+        external_id=href.strip("/"),
     )
