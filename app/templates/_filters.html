@@ -2,6 +2,7 @@
 {# Mobile-only "Filters" toggle button — opens a sticky drawer of all controls. #}
 <button type="button" id="mobile-filters-toggle" class="mobile-filters-toggle">Filters ▾</button>
 <form id="filters-form" class="filters" method="get" action="{{ form_action or request.url.path }}">
+  {% if view == 'cards' %}<input type="hidden" name="view" value="cards">{% endif %}
   {# Multi-select checkbox popover (Circuit). Same pattern reused for Session + Source. #}
   <label style="position:relative">Circuit
     <button type="button" class="when-btn check-trigger" data-target="circuit-pop">
@@ -323,7 +324,12 @@
         if (ev.key === 'Enter') { ev.preventDefault(); submitNow(); }
       });
     });
-    document.getElementById('clear-filters').addEventListener('click', function () { window.location = form.getAttribute('action') || '/'; });
+    document.getElementById('clear-filters').addEventListener('click', function () {
+      // Clearing filters shouldn't also clear the chosen layout.
+      var action = form.getAttribute('action') || '/';
+      var v = form.querySelector('input[name=view]');
+      window.location = action + (v && v.value ? '?view=' + v.value : '');
+    });
 
     // Build a URL from the current state of all controls (form + reparented
     // popover checkboxes) and navigate. We can't trust form.submit() here
