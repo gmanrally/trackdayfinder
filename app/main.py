@@ -207,6 +207,18 @@ WEEKDAY_CHOICES = [
 ]
 
 
+_MOBILE_UA = re.compile(r"Mobile|Android|iPhone|iPod", re.I)
+
+
+def _resolve_view(request: Request, view: Optional[str]) -> str:
+    """Explicit ?view= always wins; with no param, phones default to the
+    card view and desktop to the table. The toggle links are explicit in
+    both directions so either device can switch and stay switched."""
+    if view in ("cards", "table"):
+        return view
+    return "cards" if _MOBILE_UA.search(request.headers.get("user-agent", "")) else "table"
+
+
 def _qs_without(request: Request, *drop: str) -> str:
     """Current query string with the named params stripped, urlencoded."""
     from urllib.parse import urlencode
@@ -455,7 +467,7 @@ async def index(request: Request,
                 hide_sessioned: Optional[str] = None,
                 ev_ok: Optional[str] = None,
                 view: Optional[str] = None):
-    view = "cards" if view == "cards" else "table"
+    view = _resolve_view(request, view)
     weekdays = request.query_params.getlist("weekdays")
     circuits_sel  = _multi(request, "circuit")
     sources_sel   = _multi(request, "source")
@@ -668,7 +680,8 @@ async def index_chunk(request: Request,
             events = _drop_sessioned(events)
 
     tmpl = templates.env.get_template(
-        "_event_card.html" if view == "cards" else "_event_row.html")
+        "_event_card.html" if _resolve_view(request, view) == "cards"
+        else "_event_row.html")
     chunk_listing_ids: set[int] = set()
     if MARKETPLACE_ENABLED:
         from . import marketplace as _mkt
@@ -1705,6 +1718,21 @@ async def alerts_unsubscribe(request: Request, token: str):
     return templates.TemplateResponse(request, "alerts/unsubscribed.html", {
         "now_year": date.today().year,
     })
+
+
+@app.get("/manifest.webmanifest")
+async def pwa_manifest():
+    """PWA manifest served from the root so its default scope covers the site."""
+    from starlette.responses import FileResponse
+    return FileResponse(BASE / "static" / "manifest.webmanifest",
+                        media_type="application/manifest+json")
+
+
+@app.get("/sw.js")
+async def service_worker():
+    """Service worker must be served from the root to claim scope '/'."""
+    from starlette.responses import FileResponse
+    return FileResponse(BASE / "static" / "sw.js", media_type="application/javascript")
 
 
 @app.get("/favicon.ico")
