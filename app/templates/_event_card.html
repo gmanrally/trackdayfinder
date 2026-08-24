@@ -1,0 +1,41 @@
+{# Card for one event — the "Cards" alternative to _event_row.html.
+   Rendered by index.html and the /_chunk endpoint when view=cards. #}
+{% set has_space = marketplace_enabled and e.id in (listing_event_ids or []) %}
+{% set _ev = ev_status(e.source, e.circuit) %}
+<article class="event-card{% if e.sold_out %} soldout-card{% endif %}{% if has_space %} has-space{% endif %}" data-iso="{{ e.event_date.isoformat() }}">
+  <div class="ec-top">
+    <span class="ec-vehicle {{ 'ec-bike' if e.vehicle_type == 'bike' else 'ec-car' }}">{{ (e.vehicle_type or 'car') | upper }}</span>
+    {% if e.is_package %}<span class="pill" style="background:#dbeafe;color:#1e40af">package</span>{% endif %}
+    {% if e.session and e.session != 'day' %}<span class="pill" style="background:#fef3c7;color:#92400e">{{ e.session }}</span>{% endif %}
+    {% if _ev %}<span class="pill" title="{{ _ev.note }} (checked {{ ev_checked }} — confirm with organiser)"
+      style="{% if _ev.status == 'banned' %}background:#fef2f2;color:#b91c1c{% elif _ev.status == 'allowed' %}background:#ecfdf5;color:#047857{% else %}background:#fef3c7;color:#92400e{% endif %}"
+      >{% if _ev.status == 'banned' %}No EVs{% elif _ev.status == 'allowed' %}EV OK{% else %}EV OK*{% endif %}</span>{% endif %}
+  </div>
+  <h3><a href="/trackday/{{ e.source }}/{{ e.dedup_key }}">{{ e.circuit }}</a></h3>
+  <div class="ec-org"><a href="/organiser/{{ e.source }}">{{ e.organiser }}</a></div>
+  {% if e.title %}<div class="ec-title">{{ e.title }}</div>{% endif %}
+  <div class="ec-meta">
+    <span class="ec-date">{{ e.event_date.strftime('%a %d %b %Y') }}</span>
+    {% if e.noise_limit_db %}<span>{{ e.noise_limit_db }} dB</span>{% endif %}
+  </div>
+  <div class="ec-stock">
+    {%- if e.sold_out -%}
+      <span class="pill" style="background:#1f2937;color:#fff">Sold out</span>
+    {%- elif e.spaces_left is not none -%}
+      <span class="pill" style="background:{% if e.spaces_left <= 3 %}#dc2626;color:#fff{% else %}#fef3c7;color:#92400e{% endif %}">{{ e.spaces_left }} left</span>
+    {%- elif e.stock_status -%}
+      <span class="pill" style="background:#fef3c7;color:#92400e">{{ e.stock_status }}</span>
+    {%- endif -%}
+    {% if has_space %}
+    <a class="space-badge" style="margin-left:0" href="/spaces?circuit={{ e.circuit | urlencode }}"
+       title="Someone is selling their space for this trackday">Space for sale</a>
+    {% endif %}
+  </div>
+  <div class="ec-cta">
+    <button type="button" class="share-btn" data-url="{{ canonical_host }}/trackday/{{ e.source }}/{{ e.dedup_key }}">Share</button>
+    <a class="book-btn" href="/go/{{ e.id }}" target="_blank" rel="noopener">
+      {%- if e.price_gbp -%}
+        {%- if e.currency == 'EUR' -%}€{{ '%.0f' % e.price_native }} · {% else %}£{{ '%.0f' % e.price_gbp }} · {% endif -%}
+      {%- endif -%}Book →</a>
+  </div>
+</article>

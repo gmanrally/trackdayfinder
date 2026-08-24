@@ -207,12 +207,17 @@ WEEKDAY_CHOICES = [
 ]
 
 
+def _qs_without(request: Request, *drop: str) -> str:
+    """Current query string with the named params stripped, urlencoded."""
+    from urllib.parse import urlencode
+    params = [(k, v) for k, v in request.query_params.multi_items() if k not in drop]
+    return urlencode(params)
+
+
 def _qs_no_sort(request: Request) -> str:
     """Current query string with the `sort` param stripped, urlencoded.
     Used by sort-link template macro so clicking a column preserves filters."""
-    from urllib.parse import urlencode
-    params = [(k, v) for k, v in request.query_params.multi_items() if k != "sort"]
-    return urlencode(params)
+    return _qs_without(request, "sort")
 
 
 # Each "page" of the index is a 30-day window.
@@ -448,7 +453,9 @@ async def index(request: Request,
                 radius_mi: Optional[str] = None,
                 country: Optional[str] = None,
                 hide_sessioned: Optional[str] = None,
-                ev_ok: Optional[str] = None):
+                ev_ok: Optional[str] = None,
+                view: Optional[str] = None):
+    view = "cards" if view == "cards" else "table"
     weekdays = request.query_params.getlist("weekdays")
     circuits_sel  = _multi(request, "circuit")
     sources_sel   = _multi(request, "source")
@@ -583,6 +590,8 @@ async def index(request: Request,
         "today_iso": today.isoformat(),
         "sort": sort_key,
         "qs_no_sort": _qs_no_sort(request),
+        "view": view,
+        "qs_no_view": _qs_without(request, "view", "from_offset"),
         "filters": {
             "circuits": circuits_sel, "sources": sources_sel, "sessions": sessions_sel,
             "months": months_sel, "countries": countries_sel,
@@ -614,9 +623,10 @@ async def index_chunk(request: Request,
                       radius_mi: Optional[str] = None,
                       country: Optional[str] = None,
                       hide_sessioned: Optional[str] = None,
-                      ev_ok: Optional[str] = None):
-    """Returns rendered <tr>s for the next 30-day window, plus a has_more flag.
-    Used by the index page's infinite-scroll JS."""
+                      ev_ok: Optional[str] = None,
+                      view: Optional[str] = None):
+    """Returns rendered <tr>s (or cards when view=cards) for the next 30-day
+    window, plus a has_more flag. Used by the index page's infinite-scroll JS."""
     weekdays = request.query_params.getlist("weekdays")
     circuits_sel  = _multi(request, "circuit")
     sources_sel   = _multi(request, "source")
@@ -657,7 +667,8 @@ async def index_chunk(request: Request,
         if hide_sess:
             events = _drop_sessioned(events)
 
-    tmpl = templates.env.get_template("_event_row.html")
+    tmpl = templates.env.get_template(
+        "_event_card.html" if view == "cards" else "_event_row.html")
     chunk_listing_ids: set[int] = set()
     if MARKETPLACE_ENABLED:
         from . import marketplace as _mkt
