@@ -465,6 +465,32 @@
   @media (max-width: 720px) {
     tbody td.is-empty { display: none; }
   }
+
+  /* Cookie-consent banner — GA loads only after Accept (PECR). Reject is given
+     equal prominence to Accept. */
+  .cookie-banner {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9998;
+    display: flex; gap: 14px; align-items: center; justify-content: center; flex-wrap: wrap;
+    padding: 14px 20px; background: #0b1220; color: #e2e8f0;
+    box-shadow: 0 -6px 20px rgba(0,0,0,0.28); font-size: 13px; line-height: 1.5;
+  }
+  .cookie-banner[hidden] { display: none; }
+  .cookie-banner .cookie-text { max-width: 720px; }
+  .cookie-banner .cookie-text a { color: #fca5a5; text-decoration: underline; }
+  .cookie-actions { display: flex; gap: 10px; flex: 0 0 auto; }
+  .cookie-btn {
+    padding: 9px 18px; border-radius: 6px; cursor: pointer;
+    font: 600 13px 'Inter', system-ui, sans-serif; border: 1px solid transparent;
+  }
+  .cookie-accept { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .cookie-accept:hover { background: var(--accent-2); }
+  .cookie-reject { background: transparent; color: #e2e8f0; border-color: #475569; }
+  .cookie-reject:hover { border-color: #e2e8f0; }
+  @media (max-width: 640px) {
+    .cookie-banner { padding: 12px 14px; }
+    .cookie-actions { width: 100%; }
+    .cookie-btn { flex: 1; }
+  }
 </style>
 {# Umami analytics — self-hosted, GDPR-friendly. Loaded only when both
    UMAMI_SRC + UMAMI_WEBSITE_ID env vars are set on the server. #}
@@ -472,13 +498,44 @@
 <script defer src="{{ umami_src }}" data-website-id="{{ umami_website_id }}"></script>
 {% endif %}
 
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-73PF9R6CT0"></script>
+<!-- Google Analytics — consent-gated (UK PECR). gtag.js is NOT loaded until the
+     visitor clicks Accept on the cookie banner; the choice is remembered in
+     localStorage and can be withdrawn via "Cookie settings" in the footer.
+     (Umami above is cookieless and needs no consent.) -->
 <script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-73PF9R6CT0');
+(function () {
+  var GA_ID = 'G-73PF9R6CT0';
+  var KEY = 'tdf-cookie-consent';            // 'granted' | 'denied'
+  function store(v){ try { localStorage.setItem(KEY, v); } catch (e) {} }
+  function read(){ try { return localStorage.getItem(KEY); } catch (e) { return null; } }
+  function loadGA(){
+    if (window.__ga_loaded) return; window.__ga_loaded = true;
+    var s = document.createElement('script');
+    s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+    document.head.appendChild(s);
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function(){ dataLayer.push(arguments); };
+    gtag('js', new Date());
+    gtag('config', GA_ID);
+  }
+  function toggle(show){ var b = document.getElementById('cookie-banner'); if (b) b.hidden = !show; }
+
+  var choice = read();
+  if (choice === 'granted') loadGA();   // returning, consented visitor
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var accept = document.getElementById('cookie-accept');
+    var reject = document.getElementById('cookie-reject');
+    if (accept) accept.addEventListener('click', function () { store('granted'); toggle(false); loadGA(); });
+    if (reject) reject.addEventListener('click', function () { store('denied'); toggle(false); });
+    // "Cookie settings" (footer) reopens the banner so consent can be changed/withdrawn.
+    document.addEventListener('click', function (e) {
+      var t = e.target.closest ? e.target.closest('#cookie-settings') : null;
+      if (t) { e.preventDefault(); toggle(true); }
+    });
+    if (!choice) toggle(true);           // first visit — ask
+  });
+})();
 </script>
 </head>
 <body>
@@ -515,7 +572,7 @@
 {% block content %}{% endblock %}
 
 <footer style="text-align:center;padding:10px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;background:var(--card)">
-  &copy; {{ now_year }} <a class="brand-gmracing brand-gmracing-dark" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a> &middot; All rights reserved. &middot; <a href="/privacy">Privacy</a>
+  &copy; {{ now_year }} <a class="brand-gmracing brand-gmracing-dark" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a> &middot; All rights reserved. &middot; <a href="/privacy">Privacy</a> &middot; <a href="#" id="cookie-settings">Cookie settings</a>
   Listings aggregated from public organiser sites; bookings handled by the respective organisers.
 </footer>
 
@@ -570,5 +627,16 @@
     nav.appendChild(a);
   });
 </script>
+<div id="cookie-banner" class="cookie-banner" hidden role="region" aria-label="Cookie consent">
+  <div class="cookie-text">
+    We use <strong>cookieless</strong> analytics by default. May we also use
+    <strong>Google Analytics</strong> cookies to help us improve the site? See our
+    <a href="/privacy">Privacy Policy</a>.
+  </div>
+  <div class="cookie-actions">
+    <button type="button" id="cookie-reject" class="cookie-btn cookie-reject">Reject</button>
+    <button type="button" id="cookie-accept" class="cookie-btn cookie-accept">Accept</button>
+  </div>
+</div>
 </body>
 </html>

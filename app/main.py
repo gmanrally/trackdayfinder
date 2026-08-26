@@ -1685,6 +1685,36 @@ async def alerts_submit(request: Request):
     })
 
 
+@app.post("/alerts/recover", response_class=HTMLResponse)
+async def alerts_recover(request: Request):
+    """Email the manage link to an existing subscriber — the recovery path for
+    someone who deleted their alert emails. Responds identically whether the
+    address exists or not (no account enumeration)."""
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import send_mail, CANONICAL_HOST
+    form = await request.form()
+    email = (form.get("email") or "").strip().lower()
+    if "@" in email and "." in email:
+        with db_session() as s:
+            user = s.exec(select(User).where(User.email == email)).first()
+        if user:
+            manage = f"{CANONICAL_HOST}/alerts/manage/{user.token}"
+            try:
+                send_mail(email, "Your TrackdayFinder alerts manage link", f"""
+                    <p>Here's the link to manage your alerts (add or remove
+                    circuits and organisers, or unsubscribe):</p>
+                    <p><a href="{manage}">{manage}</a></p>
+                    <p style="font-size:12px;color:#94a3b8">If you didn't ask for
+                    this, you can ignore it.</p>
+                """)
+            except Exception:
+                pass
+    today = date.today()
+    return templates.TemplateResponse(request, "alerts/submitted.html", {
+        "email": email, "now_year": today.year, "recover": True,
+    })
+
+
 @app.get("/alerts/confirm/{token}", response_class=HTMLResponse)
 async def alerts_confirm(request: Request, token: str):
     if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
@@ -1988,6 +2018,46 @@ async def click_through(request: Request, event_id: int):
             s.commit()
         target = ev.booking_url
     return RedirectResponse(target, status_code=302)
+
+
+@app.get("/admin/health", response_class=HTMLResponse)
+async def admin_health(request: Request, token: str = ""):
+    """Per-source scrape health: last run, event counts, and a STALE flag when
+    a source's latest run returned 0 while upcoming events still exist (the
+    zero-events watchdog's persistent view). Gated like /admin/clicks."""
+    if not ADMIN_TOKEN or token != ADMIN_TOKEN:
+        raise HTTPException(status_code=404)
+    from .scrapers import SCRAPERS, ORGANISER_DISPLAY
+    from .ingest import VIRTUAL_SOURCE_PARENT
+    today = date.today()
+    with db_session() as s:
+        runs = {}
+        for slug in SCRAPERS:
+            r = s.exec(select(ScrapeRun).where(ScrapeRun.source == slug)
+                       .order_by(ScrapeRun.started_at.desc()).limit(1)).first()
+            runs[slug] = r
+        upcoming: dict[str, int] = {}
+        rows = s.exec(select(Event).where(Event.event_date >= today)).all()
+        for e in rows:
+            parent = VIRTUAL_SOURCE_PARENT.get(e.source, e.source)
+            upcoming[parent] = upcoming.get(parent, 0) + 1
+    out = ["<h1>Scrape health</h1><table border=1 cellpadding=6 style='border-collapse:collapse;font:14px sans-serif'>",
+           "<tr><th>source</th><th>last run</th><th>events</th><th>error</th><th>upcoming in DB</th><th>status</th></tr>"]
+    for slug in sorted(SCRAPERS):
+        r = runs.get(slug)
+        up = upcoming.get(slug, 0)
+        name = ORGANISER_DISPLAY.get(slug, slug)
+        if r is None:
+            out.append(f"<tr><td>{name}</td><td>never</td><td>—</td><td>—</td><td>{up}</td><td>never ran</td></tr>")
+            continue
+        stale = (r.n_events or 0) == 0 and not r.error and up > 0
+        status = ("<b style='color:#b91c1c'>STALE — scraper returning 0, rows rotting</b>" if stale
+                  else ("error" if r.error else "ok"))
+        out.append(
+            f"<tr><td>{name}</td><td>{r.started_at:%Y-%m-%d %H:%M}</td>"
+            f"<td>{r.n_events}</td><td>{(r.error or '')[:60]}</td><td>{up}</td><td>{status}</td></tr>")
+    out.append("</table>")
+    return HTMLResponse("".join(out))
 
 
 @app.get("/admin/clicks", response_class=HTMLResponse)
