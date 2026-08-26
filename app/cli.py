@@ -61,6 +61,16 @@ def main(argv: list[str] | None = None) -> int:
         n = alerts.run_digests()
         print(f"sent {n} digest{'s' if n != 1 else ''}")
         return 0
+    if cmd == "blog-import":
+        if len(argv) < 2:
+            print("usage: python -m app.cli blog-import <wordpress-base-url>")
+            return 2
+        from .models import init_db as _init
+        _init()
+        from . import blog as blog_mod
+        n = blog_mod.import_wordpress(argv[1])
+        print(f"imported {n} post{'s' if n != 1 else ''}")
+        return 0
     if cmd == "watch-refresh":
         results = asyncio.run(ingest.refresh_watched())
         if not results:

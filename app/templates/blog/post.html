@@ -1,0 +1,36 @@
+{% extends "_base.html" %}
+{% block title %}{{ meta_title }} | TrackdayFinder.co.uk{% endblock %}
+{% block meta_description %}{{ meta_description }}{% endblock %}
+{% block canonical %}https://trackdayfinder.co.uk/blog/{{ p.slug }}/{% endblock %}
+{% block og_type %}article{% endblock %}
+{% if hero %}{% block og_image %}{{ hero }}{% endblock %}{% endif %}
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; <a href="/blog">Blog</a> &rsaquo; {{ p.title }}</nav>{% endblock %}
+
+{% block content %}
+<article class="page">
+  <div class="blog-post">
+    <p class="sc-date" style="margin:0 0 6px">{{ (p.published_at or p.created_at).strftime('%d %B %Y') }}</p>
+    <h1 style="margin-top:0">{{ p.title }}</h1>
+    {% if hero %}<img class="blog-hero" src="{{ hero }}" alt="">{% endif %}
+    <div class="blog-content">{{ p.content | safe }}</div>
+    <hr style="margin:30px 0;border:0;border-top:1px solid var(--line)">
+    <p style="font-size:14px">Looking for a date? <a href="/">Browse every UK &amp; European trackday</a>
+      or <a href="/alerts">get email alerts</a> when new ones appear.</p>
+  </div>
+</article>
+
+<style>
+  .blog-post { max-width: 760px; }
+  .blog-hero { width:100%; max-height:380px; object-fit:cover; border-radius:var(--radius); margin:6px 0 18px; }
+  .blog-content { font-size:15px; line-height:1.7; }
+  .blog-content h2 { margin:28px 0 10px; font-size:22px; }
+  .blog-content h3 { margin:22px 0 8px; font-size:17px; }
+  .blog-content p { margin:0 0 14px; }
+  .blog-content img { max-width:100%; height:auto; border-radius:8px; }
+  .blog-content a { color: var(--accent); }
+  .blog-content ul, .blog-content ol { margin:0 0 14px; padding-left:22px; }
+  .blog-content blockquote { border-left:3px solid var(--accent); margin:14px 0; padding:4px 14px; color:var(--muted); }
+  .blog-content table { border-collapse:collapse; margin:0 0 14px; }
+  .blog-content td, .blog-content th { border:1px solid var(--line); padding:6px 10px; font-size:14px; }
+</style>
+{% endblock %}

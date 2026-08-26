@@ -1951,9 +1951,11 @@ async def favicon_legacy():
 
 @app.get("/sitemap.xml")
 async def sitemap():
+    from .models import BlogPost
     today = date.today()
     with db_session() as s:
         events = s.exec(select(Event).where(Event.event_date >= today)).all()
+        blog_posts = s.exec(select(BlogPost).where(BlogPost.status == "publish")).all()
     organisers = sorted({e.source for e in events})
     circuits = sorted({slugify(e.circuit) for e in events})
 
@@ -1964,6 +1966,10 @@ async def sitemap():
         urls.append((f"{CANONICAL_HOST}/circuit/{c}", "0.8", "daily"))
     for e in events:
         urls.append((f"{CANONICAL_HOST}/trackday/{e.source}/{e.dedup_key}", "0.6", "weekly"))
+    if blog_posts:
+        urls.append((f"{CANONICAL_HOST}/blog", "0.7", "weekly"))
+        for bp in blog_posts:
+            urls.append((f"{CANONICAL_HOST}/blog/{bp.slug}/", "0.6", "monthly"))
 
     body = ['<?xml version="1.0" encoding="UTF-8"?>',
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">']
@@ -1971,6 +1977,11 @@ async def sitemap():
         body.append(f"<url><loc>{loc}</loc><changefreq>{freq}</changefreq><priority>{prio}</priority></url>")
     body.append("</urlset>")
     return Response("\n".join(body), media_type="application/xml")
+
+
+# Native blog + WordPress-REST facade for seo-studio (replaces the WP stack).
+from . import blog as _blog  # noqa: E402
+app.include_router(_blog.router)
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)

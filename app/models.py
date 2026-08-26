@@ -148,6 +148,34 @@ class ContactRequest(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
+class BlogPost(SQLModel, table=True):
+    """Native blog post — replaced the WordPress stack (2026-08). Content is
+    trusted HTML: it only arrives via the authenticated wp-facade API
+    (seo-studio) or the one-off WordPress import."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    slug: str = Field(index=True, unique=True)
+    title: str
+    content: str = ""                                # raw HTML body
+    status: str = Field(default="draft", index=True) # draft | publish
+    featured_media_id: Optional[int] = None          # BlogMedia.id
+    focus_keyword: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    published_at: Optional[datetime] = Field(default=None, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class BlogMedia(SQLModel, table=True):
+    """Uploaded blog image/file. The bytes live under DATA/blog_media/ (the
+    persistent volume); this row is the WP-shaped metadata."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    filename: str = Field(index=True, unique=True)   # stored basename
+    alt_text: str = ""
+    title: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
     # Additive migrations: create_all never alters existing tables, so new

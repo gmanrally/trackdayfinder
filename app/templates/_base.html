@@ -556,6 +556,7 @@
     <a href="/{{ _q }}" class="{{ 'active' if _p == '/' else '' }}">List</a>
     <a href="/map{{ _q }}" class="{{ 'active' if _p.startswith('/map') else '' }}">Map</a>
     <a href="/calendar{{ _q }}" class="{{ 'active' if _p.startswith('/calendar') else '' }}">Calendar</a>
+    <a href="/blog" class="{{ 'active' if _p.startswith('/blog') else '' }}" title="Trackday guides and news">Blog</a>
     {% if marketplace_enabled %}<a href="/spaces" class="{{ 'active' if _p.startswith('/spaces') else '' }}" title="Trackday spaces for sale">Spaces</a>{% endif %}
     {% if alerts_enabled %}<a href="/alerts" class="{{ 'active' if _p.startswith('/alerts') else '' }}" title="Get email alerts when matching trackdays appear">Alerts</a>{% endif %}
   </nav>

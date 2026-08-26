@@ -1,0 +1,31 @@
+{% extends "_base.html" %}
+{% block title %}Trackday Guides & News — TrackdayFinder Blog{% endblock %}
+{% block meta_description %}Guides, checklists and news for UK and European trackdays — first-timer walkthroughs, insurance, prep, and how to find cheap spaces.{% endblock %}
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; Blog{% endblock %}
+
+{% block content %}
+<article class="page">
+  <h1>Trackday guides &amp; news</h1>
+  <p class="lede">Everything we've learned aggregating every UK and European trackday — guides, checklists and money-savers.</p>
+
+  {% if items %}
+  <div class="space-cards" style="grid-template-columns:repeat(auto-fill,minmax(290px,1fr))">
+    {% for it in items %}
+    <article class="space-card">
+      {% if it.image %}
+      <a href="/blog/{{ it.post.slug }}/" style="margin:-14px -16px 4px;display:block">
+        <img src="{{ it.image }}" alt="" loading="lazy"
+             style="width:100%;height:150px;object-fit:cover;border-radius:5px 5px 0 0"></a>
+      {% endif %}
+      <span class="sc-date">{{ (it.post.published_at or it.post.created_at).strftime('%d %b %Y') }}</span>
+      <h3><a href="/blog/{{ it.post.slug }}/">{{ it.post.title }}</a></h3>
+      <p class="sc-note">{{ it.excerpt }}</p>
+      <div class="sc-cta"><a class="book-btn" href="/blog/{{ it.post.slug }}/">Read →</a></div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">No posts yet.</div>
+  {% endif %}
+</article>
+{% endblock %}
