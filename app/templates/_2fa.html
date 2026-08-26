@@ -1,0 +1,26 @@
+{% extends "_base.html" %}
+{% block title %}Enter your authenticator code | TrackdayFinder.co.uk{% endblock %}
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; Verify</nav>{% endblock %}
+{% block content %}
+<article class="page">
+  <div style="background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:26px 30px;box-shadow:var(--shadow-sm);max-width:460px">
+    <h1 style="margin-top:0">Two-step check</h1>
+    <p class="lede" style="font-size:15px">This account has an authenticator app enabled.
+      Enter the current 6-digit code to continue.</p>
+    {% if error %}
+    <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:14px">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/2fa" style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="hidden" name="t" value="{{ t }}">
+      <input type="hidden" name="next" value="{{ next }}">
+      <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code"
+             pattern="[0-9]*" maxlength="7" required placeholder="123 456" autofocus
+             style="flex:1 1 140px;padding:10px 12px;border:1px solid var(--line-2);border-radius:6px;font:18px 'Inter',system-ui,sans-serif;letter-spacing:.12em;text-align:center">
+      <button type="submit" class="book-btn" style="border:0;cursor:pointer;padding:10px 20px;font-size:14px">Verify</button>
+    </form>
+    <p style="margin-top:16px;font-size:12px;color:var(--muted)">Lost access to your
+      authenticator? Email <a href="mailto:youmissedone@trackdayfinder.co.uk">us</a> from
+      your account email address.</p>
+  </div>
+</article>
+{% endblock %}

@@ -33,6 +33,12 @@
   <h2 style="margin-top:28px">Add more</h2>
   <p><a class="book-btn" href="/alerts">Watch more circuits or organisers →</a></p>
 
+  <h2 style="margin-top:28px">Security</h2>
+  <p style="font-size:13px;color:var(--muted)">
+    {% if user.totp_enabled %}Authenticator app is <strong style="color:#0f766e">on</strong> for this account.
+    {% else %}Add an authenticator app so your emailed links need a code too.{% endif %}
+    <a href="/account/security/{{ user.token }}">Manage →</a></p>
+
   <h2 style="margin-top:28px">Stop receiving alerts</h2>
   <p><a href="/alerts/unsubscribe/{{ user.token }}" style="color:var(--muted)">Unsubscribe and remove all watches →</a></p>
 </article>

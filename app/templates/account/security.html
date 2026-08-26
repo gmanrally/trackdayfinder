@@ -1,0 +1,51 @@
+{% extends "_base.html" %}
+{% block title %}Account security | TrackdayFinder.co.uk{% endblock %}
+{% block crumbs %}<nav class="crumbs"><a href="/">Home</a> &rsaquo; Security</nav>{% endblock %}
+{% block content %}
+<article class="page">
+  <div style="background:#fff;border:1px solid var(--line);border-radius:var(--radius);padding:26px 30px;box-shadow:var(--shadow-sm);max-width:560px">
+    <h1 style="margin-top:0">Account security</h1>
+    <p class="lede" style="font-size:15px">{{ user.email }}</p>
+
+    {% if done == 'on' %}
+    <div style="background:#ecfdf5;border:1px solid #a7f3d0;color:#047857;border-radius:8px;padding:10px 12px;margin:0 0 16px;font-size:14px">
+      Authenticator enabled. From now on, sign-in and account links will ask for a code.</div>
+    {% elif done == 'off' %}
+    <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:10px 12px;margin:0 0 16px;font-size:14px">
+      Authenticator disabled — your emailed links work on their own again.</div>
+    {% endif %}
+    {% if error %}
+    <div style="background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;border-radius:8px;padding:10px 12px;margin:0 0 14px;font-size:14px">{{ error }}</div>
+    {% endif %}
+
+    {% if user.totp_enabled %}
+    <p><strong style="color:#047857">Authenticator app is on.</strong> Your emailed sign-in
+      and manage links ask for a 6-digit code before they work.</p>
+    <h2 style="font-size:15px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:24px 0 10px">Turn off</h2>
+    <form method="post" action="/account/security/{{ user.token }}/disable" style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7"
+             required placeholder="Current code"
+             style="flex:1 1 140px;padding:9px 11px;border:1px solid var(--line-2);border-radius:6px;font:14px 'Inter',system-ui,sans-serif">
+      <button type="submit" class="book-btn" style="border:0;cursor:pointer;padding:9px 18px;font-size:13px;background:#64748b">Disable</button>
+    </form>
+    {% else %}
+    <p>Add an authenticator app (Google Authenticator, Aegis, 1Password…) as a second
+      step. Once enabled, your emailed sign-in and manage links also ask for the
+      current 6-digit code — so a forwarded or leaked email isn't enough to get in.</p>
+    {% if qr %}
+    <p style="text-align:center;margin:18px 0"><img src="{{ qr }}" alt="Scan this QR code with your authenticator app" style="width:180px;height:180px"></p>
+    {% endif %}
+    <p style="font-size:13px;color:var(--muted)">Can't scan? Enter this key manually:
+      <code style="background:#f1f5f9;padding:2px 8px;border-radius:4px;font-size:13px;word-break:break-all">{{ manual_key }}</code></p>
+    <form method="post" action="/account/security/{{ user.token }}/enable" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+      <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7"
+             required placeholder="Code from the app"
+             style="flex:1 1 160px;padding:9px 11px;border:1px solid var(--line-2);border-radius:6px;font:14px 'Inter',system-ui,sans-serif">
+      <button type="submit" class="book-btn" style="border:0;cursor:pointer;padding:9px 18px;font-size:13px">Enable</button>
+    </form>
+    <p style="margin-top:14px;font-size:12px;color:var(--muted)">Keep the app safe: if you
+      lose it, you'll need to email us from your account address to get back in.</p>
+    {% endif %}
+  </div>
+</article>
+{% endblock %}

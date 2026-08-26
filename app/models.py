@@ -61,13 +61,18 @@ class EventSnapshot(SQLModel, table=True):
 
 
 class User(SQLModel, table=True):
-    """A subscriber to email alerts. Magic-link auth, no password."""
+    """A subscriber to email alerts / marketplace buyer. Magic-link auth, no
+    password. Optional TOTP second factor: the emailed links are long-lived
+    bearer tokens, so users who enable an authenticator get a 6-digit code
+    challenge before a session is established or account pages open."""
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(index=True, unique=True)
     confirmed: bool = Field(default=False)
     token: str = Field(index=True, unique=True)   # opaque secret for manage/unsub links
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_digest_at: Optional[datetime] = None
+    totp_secret: Optional[str] = None             # base32; set at enrol, may be unconfirmed
+    totp_enabled: bool = Field(default=False)     # True only after a valid code confirmed enrolment
 
 
 class Watch(SQLModel, table=True):
@@ -145,6 +150,15 @@ class ContactRequest(SQLModel, table=True):
 
 def init_db() -> None:
     SQLModel.metadata.create_all(engine)
+    # Additive migrations: create_all never alters existing tables, so new
+    # columns on live tables are added here. Idempotent and cheap.
+    import sqlite3
+    with sqlite3.connect(DB_PATH) as conn:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(user)")}
+        if "totp_secret" not in cols:
+            conn.execute("ALTER TABLE user ADD COLUMN totp_secret VARCHAR")
+        if "totp_enabled" not in cols:
+            conn.execute("ALTER TABLE user ADD COLUMN totp_enabled BOOLEAN NOT NULL DEFAULT 0")
 
 
 def session() -> Session:

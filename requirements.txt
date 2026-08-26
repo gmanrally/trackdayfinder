@@ -9,3 +9,4 @@ sqlmodel>=0.0.16
 apscheduler>=3.10
 rapidfuzz>=3.6
 python-multipart>=0.0.9
+segno>=1.6

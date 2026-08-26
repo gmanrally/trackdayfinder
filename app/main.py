@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, Response
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
@@ -1450,6 +1450,18 @@ async def spaces_verify(request: Request, token: str):
     })
 
 
+def _seller_challenge(request: Request, listing) -> Optional[str]:
+    """If the seller has a TOTP-enabled account, their listing manage links
+    get the same challenge as their other bearer links. Sellers without an
+    account (never opted into alerts) are unchanged."""
+    from .twofa import needs_challenge
+    with db_session() as s:
+        u = s.exec(select(User).where(User.email == listing.seller_email)).first()
+    if u and needs_challenge(request, u):
+        return f"/2fa?t={u.token}&next=/spaces/manage/{listing.manage_token}"
+    return None
+
+
 @app.get("/spaces/manage/{token}", response_class=HTMLResponse)
 async def spaces_manage(request: Request, token: str):
     """Seller self-manage page — mark sold / remove."""
@@ -1459,6 +1471,9 @@ async def spaces_manage(request: Request, token: str):
         listing = s.exec(select(Listing).where(Listing.manage_token == token)).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
+    challenge = _seller_challenge(request, listing)
+    if challenge:
+        return RedirectResponse(challenge, status_code=302)
     return templates.TemplateResponse(request, "spaces/manage.html", {
         "listing": listing, "now_year": date.today().year,
     })
@@ -1468,6 +1483,14 @@ async def spaces_manage(request: Request, token: str):
 async def spaces_manage_post(request: Request, token: str):
     if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
     from . import marketplace as mkt
+    from .models import Listing
+    with db_session() as s:
+        existing = s.exec(select(Listing).where(Listing.manage_token == token)).first()
+    if not existing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    challenge = _seller_challenge(request, existing)
+    if challenge:
+        return RedirectResponse(challenge, status_code=302)
     form = await request.form()
     listing = mkt.set_status(token, (form.get("status") or "").strip())
     if not listing:
@@ -1569,9 +1592,12 @@ async def spaces_session(request: Request, token: str):
     if not MARKETPLACE_ENABLED: raise HTTPException(status_code=404)
     from starlette.responses import RedirectResponse
     from .alerts import find_user_by_token
+    from .twofa import needs_challenge
     user = find_user_by_token(token)
     if not user:
         raise HTTPException(status_code=404, detail="Invalid or expired link")
+    if needs_challenge(request, user):
+        return RedirectResponse(f"/2fa?t={token}&next=/spaces/session/{token}", status_code=302)
     resp = RedirectResponse("/spaces", status_code=302)
     resp.set_cookie(
         BUYER_COOKIE, token, max_age=60 * 60 * 24 * 90,
@@ -1679,9 +1705,12 @@ async def alerts_confirm(request: Request, token: str):
 async def alerts_manage(request: Request, token: str):
     if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
     from .alerts import find_user_by_token
+    from .twofa import needs_challenge
     user = find_user_by_token(token)
     if not user:
         raise HTTPException(status_code=404, detail="Invalid link")
+    if needs_challenge(request, user):
+        return RedirectResponse(f"/2fa?t={token}&next=/alerts/manage/{token}", status_code=302)
     with db_session() as s:
         watches = s.exec(select(Watch).where(Watch.user_id == user.id)).all()
         # Resolve event watches to readable titles
@@ -1701,10 +1730,13 @@ async def alerts_manage(request: Request, token: str):
 async def alerts_remove_watch(request: Request, token: str, watch_id: int):
     if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
     from .alerts import find_user_by_token, remove_watch
+    from .twofa import needs_challenge
     from starlette.responses import RedirectResponse
     user = find_user_by_token(token)
     if not user:
         raise HTTPException(status_code=404)
+    if needs_challenge(request, user):
+        return RedirectResponse(f"/2fa?t={token}&next=/alerts/manage/{token}", status_code=302)
     remove_watch(watch_id, user.id)
     return RedirectResponse(f"/alerts/manage/{token}", status_code=303)
 
@@ -1726,6 +1758,131 @@ async def alerts_unsubscribe(request: Request, token: str):
     return templates.TemplateResponse(request, "alerts/unsubscribed.html", {
         "now_year": date.today().year,
     })
+
+
+# ============ Optional TOTP second factor ============
+
+def _safe_next(nxt: str | None) -> str:
+    """Only same-site paths — never absolute URLs (open-redirect guard)."""
+    nxt = (nxt or "").strip()
+    if nxt.startswith("/") and not nxt.startswith("//"):
+        return nxt
+    return "/"
+
+
+@app.get("/2fa", response_class=HTMLResponse)
+async def twofa_challenge(request: Request, t: str = "", next: str = "/"):
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import find_user_by_token
+    user = find_user_by_token(t)
+    if not user or not user.totp_enabled:
+        return RedirectResponse(_safe_next(next), status_code=302)
+    return templates.TemplateResponse(request, "_2fa.html", {
+        "t": t, "next": _safe_next(next), "error": None,
+        "now_year": date.today().year,
+    })
+
+
+@app.post("/2fa", response_class=HTMLResponse)
+async def twofa_challenge_post(request: Request):
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import find_user_by_token
+    from .twofa import totp_verify, challenge_cookie_value, CHALLENGE_COOKIE, CHALLENGE_TTL
+    form = await request.form()
+    t = (form.get("t") or "").strip()
+    nxt = _safe_next(form.get("next"))
+    user = find_user_by_token(t)
+    if not user or not user.totp_enabled:
+        return RedirectResponse(nxt, status_code=302)
+    if not totp_verify(user.totp_secret or "", form.get("code") or ""):
+        return templates.TemplateResponse(request, "_2fa.html", {
+            "t": t, "next": nxt, "error": "That code didn't match — try again.",
+            "now_year": date.today().year,
+        }, status_code=400)
+    resp = RedirectResponse(nxt, status_code=302)
+    resp.set_cookie(CHALLENGE_COOKIE, challenge_cookie_value(user.id),
+                    max_age=CHALLENGE_TTL, httponly=True, samesite="lax", secure=True)
+    return resp
+
+
+@app.get("/account/security/{token}", response_class=HTMLResponse)
+async def account_security(request: Request, token: str, done: str = ""):
+    """Enable / disable the authenticator. Reached from alert emails' manage
+    page and the signed-in spaces board."""
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import find_user_by_token
+    from .twofa import (needs_challenge, new_totp_secret, otpauth_uri,
+                        qr_svg_data_uri)
+    user = find_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=404)
+    if needs_challenge(request, user):
+        return RedirectResponse(f"/2fa?t={token}&next=/account/security/{token}", status_code=302)
+    qr = manual_key = None
+    if not user.totp_enabled:
+        if not user.totp_secret:
+            with db_session() as s:
+                u = s.exec(select(User).where(User.id == user.id)).first()
+                u.totp_secret = new_totp_secret()
+                s.commit()
+                s.refresh(u)  # commit expires attrs; reload before session closes
+                user = u
+        uri = otpauth_uri(user.totp_secret, user.email)
+        qr = qr_svg_data_uri(uri)
+        manual_key = user.totp_secret
+    return templates.TemplateResponse(request, "account/security.html", {
+        "user": user, "qr": qr, "manual_key": manual_key,
+        "done": done, "error": None, "now_year": date.today().year,
+    })
+
+
+@app.post("/account/security/{token}/enable", response_class=HTMLResponse)
+async def account_security_enable(request: Request, token: str):
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import find_user_by_token
+    from .twofa import totp_verify, challenge_cookie_value, CHALLENGE_COOKIE, CHALLENGE_TTL
+    user = find_user_by_token(token)
+    if not user or not user.totp_secret or user.totp_enabled:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    if not totp_verify(user.totp_secret, form.get("code") or ""):
+        from .twofa import otpauth_uri, qr_svg_data_uri
+        return templates.TemplateResponse(request, "account/security.html", {
+            "user": user, "qr": qr_svg_data_uri(otpauth_uri(user.totp_secret, user.email)),
+            "manual_key": user.totp_secret, "done": "",
+            "error": "That code didn't match — scan again and enter the current code.",
+            "now_year": date.today().year,
+        }, status_code=400)
+    with db_session() as s:
+        u = s.exec(select(User).where(User.id == user.id)).first()
+        u.totp_enabled = True
+        s.commit()
+    resp = RedirectResponse(f"/account/security/{token}?done=on", status_code=303)
+    resp.set_cookie(CHALLENGE_COOKIE, challenge_cookie_value(user.id),
+                    max_age=CHALLENGE_TTL, httponly=True, samesite="lax", secure=True)
+    return resp
+
+
+@app.post("/account/security/{token}/disable", response_class=HTMLResponse)
+async def account_security_disable(request: Request, token: str):
+    if not ALERT_LINKS_ENABLED: raise HTTPException(status_code=404)
+    from .alerts import find_user_by_token
+    from .twofa import totp_verify
+    user = find_user_by_token(token)
+    if not user or not user.totp_enabled:
+        raise HTTPException(status_code=404)
+    form = await request.form()
+    if not totp_verify(user.totp_secret or "", form.get("code") or ""):
+        return templates.TemplateResponse(request, "account/security.html", {
+            "user": user, "qr": None, "manual_key": None, "done": "",
+            "error": "That code didn't match.", "now_year": date.today().year,
+        }, status_code=400)
+    with db_session() as s:
+        u = s.exec(select(User).where(User.id == user.id)).first()
+        u.totp_enabled = False
+        u.totp_secret = None
+        s.commit()
+    return RedirectResponse(f"/account/security/{token}?done=off", status_code=303)
 
 
 @app.get("/manifest.webmanifest")

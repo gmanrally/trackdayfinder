@@ -74,7 +74,8 @@
 
   {% if buyer %}
   <p style="margin-top:14px;font-size:12px;color:var(--muted)">
-    Signed in as {{ buyer.email }} · <a href="/spaces/logout">sign out</a>
+    Signed in as {{ buyer.email }} · <a href="/account/security/{{ buyer.token }}">security</a>
+    · <a href="/spaces/logout">sign out</a>
   </p>
   {% endif %}
 
