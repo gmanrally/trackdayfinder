@@ -1,6 +1,7 @@
 """Run scrapers and upsert results into the DB."""
 from __future__ import annotations
 import asyncio
+import os
 from datetime import datetime, timedelta, date as _date
 from sqlmodel import select, delete as sql_delete
 from .models import Event, ScrapeRun, EventSnapshot, init_db, session
@@ -172,6 +173,12 @@ async def run_one(slug: str) -> tuple[int, str | None]:
         with session() as s:
             s.add(run)
             s.commit()
+    # After the run is recorded: previous run in history is the true
+    # predecessor, so the zero-events edge detection sees the right pair.
+    try:
+        _check_source_health(slug, n, err)
+    except Exception:
+        pass
     return n, err
 
 
@@ -181,6 +188,53 @@ VIRTUAL_SOURCE_PARENT = {
     "nurburgring_tf": "rsr_nurburg",
     "destination_nurburgring": "rsr_nurburg",
 }
+
+ADMIN_ALERT_EMAIL = os.environ.get("TDF_ADMIN_EMAIL", "youmissedone@trackdayfinder.co.uk")
+
+
+def _check_source_health(slug: str, n: int, err: str | None) -> bool:
+    """Zero-events watchdog. A scrape that 'succeeds' with nothing to parse,
+    while the DB still holds upcoming events for the source, almost always
+    means a site redesign broke the parser — the No Limits incident ran a
+    month like that, silently serving stale rows with dead booking links.
+
+    Alerts once, on the transition from a working run to an empty one (the
+    previous completed run had events); /admin/health shows the persistent
+    state. Returns True when an alert email was sent."""
+    if n > 0 or err is not None:
+        return False
+    today = _date.today()
+    slugs = [slug] + [v for v, p in VIRTUAL_SOURCE_PARENT.items() if p == slug]
+    with session() as s:
+        upcoming = s.exec(select(Event).where(
+            Event.source.in_(slugs), Event.event_date >= today).limit(1)).first()
+        if upcoming is None:
+            return False
+        runs = s.exec(select(ScrapeRun).where(ScrapeRun.source == slug)
+                      .order_by(ScrapeRun.started_at.desc()).limit(2)).all()
+        prev = runs[1] if len(runs) > 1 else None
+        if prev is None or (prev.n_events or 0) == 0:
+            return False   # already broken (alerted on the edge) or no history
+        n_upcoming = len(s.exec(select(Event).where(
+            Event.source.in_(slugs), Event.event_date >= today)).all())
+    try:
+        from .alerts import send_mail
+        send_mail(
+            ADMIN_ALERT_EMAIL,
+            f"[TrackdayFinder] scraper '{slug}' returned 0 events",
+            f"""
+            <p><strong>{slug}</strong> just scraped 0 events, but the database
+            still holds {n_upcoming} upcoming events for it — from here they go
+            stale and their booking links may be dead.</p>
+            <p>The previous run ({prev.started_at:%Y-%m-%d %H:%M}) returned
+            {prev.n_events} events, so the site has probably been restructured
+            and the parser needs updating.</p>
+            <p>Ongoing state: /admin/health</p>
+            """,
+        )
+        return True
+    except Exception:
+        return False
 
 
 async def refresh_watched() -> dict[str, tuple[int, str | None]]:

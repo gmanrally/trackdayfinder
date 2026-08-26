@@ -5,7 +5,12 @@
 {% block content %}
 <article class="page">
   <h1>Check your email</h1>
+  {% if recover %}
+  <p class="lede">If <strong>{{ email }}</strong> has alerts set up, we've emailed its manage link.</p>
+  <p>Nothing after a few minutes? Check spam — or the address may not have any alerts yet: <a href="/alerts">set some up</a>.</p>
+  {% else %}
   <p class="lede">We've sent a confirmation link to <strong>{{ email }}</strong>. Click it and your alerts are live.</p>
   <p>If it doesn't arrive in 5 minutes, check your spam folder, or <a href="/alerts">try again</a>.</p>
+  {% endif %}
 </article>
 {% endblock %}

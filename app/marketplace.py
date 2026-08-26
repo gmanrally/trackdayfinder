@@ -112,11 +112,25 @@ def verify_listing(token: str) -> Optional[Listing]:
 
 def _send_live_email(listing: Listing) -> None:
     manage = f"{CANONICAL_HOST}/spaces/manage/{listing.manage_token}"
+    alerts_line = ""
+    if listing.alerts_opt_in:
+        # They opted into circuit alerts on the form — give them their manage
+        # link now rather than making them wait for the first alert email.
+        try:
+            u, _ = get_or_create_user(listing.seller_email)
+            alerts_url = f"{CANONICAL_HOST}/alerts/manage/{u.token}"
+            alerts_line = (
+                f'<p style="font-size:12px;color:#64748b">You also opted into '
+                f'{listing.circuit} alerts — manage them any time:<br>'
+                f'<a href="{alerts_url}">{alerts_url}</a></p>')
+        except Exception:
+            pass
     html = f"""
     <p>Your space is now live on the TrackdayFinder board:
        <strong>{listing.circuit}</strong> — {listing.event_date:%a %d %b %Y}.</p>
     <p>Manage it here (mark as sold or remove) at any time:</p>
     <p><a href="{manage}">{manage}</a></p>
+    {alerts_line}
     """
     send_mail(listing.seller_email, "Your trackday space is live", html)
 

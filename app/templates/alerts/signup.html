@@ -23,7 +23,8 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;font-size:13px">
         {% for c in circuits %}
         <label style="display:flex;align-items:center;gap:6px">
-          <input type="checkbox" name="circuit" value="{{ c }}"> {{ c }}
+          <input type="checkbox" name="circuit" value="{{ c }}"
+                 {% if c in (preselect_circuits or []) %}checked{% endif %}> {{ c }}
         </label>
         {% endfor %}
       </div>
@@ -37,7 +38,8 @@
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px;font-size:13px">
         {% for slug, name in items %}
         <label style="display:flex;align-items:center;gap:6px">
-          <input type="checkbox" name="source" value="{{ slug }}"> {{ name }}
+          <input type="checkbox" name="source" value="{{ slug }}"
+                 {% if slug in (preselect_sources or []) %}checked{% endif %}> {{ name }}
         </label>
         {% endfor %}
       </div>
@@ -52,5 +54,15 @@
       Unsubscribe at any time from any email.
     </p>
   </form>
+
+  <div style="margin-top:26px;padding:14px;border:1px solid var(--line);border-radius:8px;background:#fff;max-width:640px">
+    <p style="margin:0 0 8px;font-weight:600;font-size:14px">Already have alerts?</p>
+    <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">Lost the emails with your manage link? We'll send it again.</p>
+    <form method="post" action="/alerts/recover" style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="email" name="email" required placeholder="you@example.com"
+             style="flex:1 1 220px;padding:8px 10px;border:1px solid var(--line-2);border-radius:6px;font-size:14px">
+      <button type="submit" class="book-btn" style="border:0;cursor:pointer;padding:8px 16px;font-size:13px">Email my manage link</button>
+    </form>
+  </div>
 </article>
 {% endblock %}

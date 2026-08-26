@@ -1632,8 +1632,12 @@ async def alerts_signup(request: Request):
         ("European",      [(s, ORGANISER_DISPLAY.get(s, s)) for s in source_slugs if SOURCE_REGION.get(s, "UK") == "EU"]),
     ]
     sources_grouped = [g for g in sources_grouped if g[1]]
+    # ?circuit=X / ?source=Y pre-tick their checkboxes — used by the
+    # "Get alerts for this circuit" CTAs on circuit/organiser pages.
     return templates.TemplateResponse(request, "alerts/signup.html", {
         "circuits": circuits, "sources_grouped": sources_grouped,
+        "preselect_circuits": set(_multi(request, "circuit")),
+        "preselect_sources": set(_multi(request, "source")),
         "now_year": today.year, "submitted": False,
     })
 

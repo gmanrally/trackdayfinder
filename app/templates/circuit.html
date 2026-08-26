@@ -17,6 +17,13 @@
   </ul>
   {% endif %}
 
+  {% if alerts_enabled %}
+  <p style="margin:0 0 18px">
+    <a class="book-btn" href="/alerts?circuit={{ circuit | urlencode }}"
+       style="background:#0f172a">🔔 Get email alerts for {{ circuit }} — new dates, price drops, spaces</a>
+  </p>
+  {% endif %}
+
   {% if events %}
   <div class="table-scroll">
   <table>
