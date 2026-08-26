@@ -1327,6 +1327,14 @@ def _buyer_from_request(request: Request):
     return find_user_by_token(token)
 
 
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy(request: Request):
+    """UK GDPR privacy notice. Always public (no feature flag)."""
+    return templates.TemplateResponse(request, "privacy.html", {
+        "now_year": date.today().year,
+    })
+
+
 @app.get("/spaces", response_class=HTMLResponse)
 async def spaces_board(request: Request, circuit: Optional[str] = None):
     """Public noticeboard of trackday spaces for sale."""
