@@ -29,8 +29,8 @@
     {{ sort_link('Price', 'price', sort, qs_no_sort) }}</span>
   {% endif %}
   <div class="view-toggle">
-    <a href="?{{ qs_no_view }}{{ '&amp;' if qs_no_view else '' }}view=table" class="{{ 'on' if view != 'cards' else '' }}">List</a><a
-       href="?{{ qs_no_view }}{{ '&amp;' if qs_no_view else '' }}view=cards" class="{{ 'on' if view == 'cards' else '' }}">Cards</a>
+    <a href="?{{ qs_no_view }}{{ '&' if qs_no_view else '' }}view=table" class="{{ 'on' if view != 'cards' else '' }}">List</a><a
+       href="?{{ qs_no_view }}{{ '&' if qs_no_view else '' }}view=cards" class="{{ 'on' if view == 'cards' else '' }}">Cards</a>
   </div>
 </div>
 
