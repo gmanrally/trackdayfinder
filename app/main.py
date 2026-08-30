@@ -32,6 +32,13 @@ ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "").strip()
 # is the per-site UUID from Umami's settings.
 UMAMI_SRC = os.environ.get("UMAMI_SRC", "").strip()
 UMAMI_WEBSITE_ID = os.environ.get("UMAMI_WEBSITE_ID", "").strip()
+# Google Analytics 4. Unset = no Google script is requested at all and the
+# cookie banner stays hidden (Umami is cookieless, so there's nothing to
+# consent to).
+GA_MEASUREMENT_ID = os.environ.get("GA_MEASUREMENT_ID", "").strip()
+# Search-engine ownership tokens; each renders a <meta> tag when set.
+GOOGLE_SITE_VERIFICATION = os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip()
+BING_SITE_VERIFICATION = os.environ.get("BING_SITE_VERIFICATION", "").strip()
 
 
 def slugify(s: str) -> str:
@@ -65,6 +72,9 @@ templates.env.globals["ev_status"] = _ev_status
 templates.env.globals["ev_checked"] = _EV_CHECKED
 templates.env.globals["umami_src"] = UMAMI_SRC
 templates.env.globals["umami_website_id"] = UMAMI_WEBSITE_ID
+templates.env.globals["ga_measurement_id"] = GA_MEASUREMENT_ID
+templates.env.globals["google_site_verification"] = GOOGLE_SITE_VERIFICATION
+templates.env.globals["bing_site_verification"] = BING_SITE_VERIFICATION
 
 
 def _breadcrumbs(path: str) -> list[dict]:
@@ -419,6 +429,19 @@ def _filtered_events_query(circuit, vehicle, source, session,
     return q, sort_key
 
 
+async def _nightly_refresh() -> None:
+    """The nightly job: rescrape everything, then tell the IndexNow engines
+    about whatever that added. Submission failures are logged and ignored —
+    they must never make the refresh look like it failed."""
+    await ingest.run_all()
+    try:
+        from . import indexnow
+        n = await indexnow.submit_recent()
+        print(f"[indexnow] submitted {n} urls")
+    except Exception as e:                      # pragma: no cover
+        print(f"[indexnow] submission skipped: {type(e).__name__}: {e}")
+
+
 @app.on_event("startup")
 async def _startup() -> None:
     init_db()
@@ -429,7 +452,7 @@ async def _startup() -> None:
     # plus an explicit `python -m app.cli refresh` for first-boot or on demand.
     hour = int(os.environ.get("TRACKDAYFINDER_REFRESH_HOUR", "3"))
     minute = int(os.environ.get("TRACKDAYFINDER_REFRESH_MINUTE", "0"))
-    scheduler.add_job(ingest.run_all, "cron", hour=hour, minute=minute, id="refresh")
+    scheduler.add_job(_nightly_refresh, "cron", hour=hour, minute=minute, id="refresh")
     # Daily digest at 06:00 — 3 hours after the 03:00 refresh — only when
     # alerts are enabled via env var (otherwise no users to digest anyway).
     if ALERTS_ENABLED:
@@ -1992,6 +2015,11 @@ async def sitemap():
 # Native blog + WordPress-REST facade for seo-studio (replaces the WP stack).
 from . import blog as _blog  # noqa: E402
 app.include_router(_blog.router)
+
+
+# IndexNow key file at /<key>.txt, so Bing/Yandex can verify our submissions.
+from . import indexnow as _indexnow  # noqa: E402
+_indexnow.register(app)
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)

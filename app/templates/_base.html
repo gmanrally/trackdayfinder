@@ -32,6 +32,9 @@
 <meta name="theme-color" content="#0b1220">
 <meta name="apple-mobile-web-app-title" content="TrackdayFinder">
 
+{% if google_site_verification %}<meta name="google-site-verification" content="{{ google_site_verification }}">{% endif %}
+{% if bing_site_verification %}<meta name="msvalidate.01" content="{{ bing_site_verification }}">{% endif %}
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -535,7 +538,8 @@
      (Umami above is cookieless and needs no consent.) -->
 <script>
 (function () {
-  var GA_ID = 'G-73PF9R6CT0';
+  var GA_ID = '{{ ga_measurement_id }}';
+  if (!GA_ID) return;
   var KEY = 'tdf-cookie-consent';            // 'granted' | 'denied'
   function store(v){ try { localStorage.setItem(KEY, v); } catch (e) {} }
   function read(){ try { return localStorage.getItem(KEY); } catch (e) { return null; } }

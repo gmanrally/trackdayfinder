@@ -50,6 +50,13 @@ def main(argv: list[str] | None = None) -> int:
             results = asyncio.run(ingest.run_all())
             for slug, (n, err) in results.items():
                 print(f"{slug}: {n} events" + (f" ERROR {err}" if err else ""))
+            # Host-side cron uses this path, so submit here too — otherwise
+            # only the in-process nightly job would ever ping IndexNow.
+            try:
+                from . import indexnow
+                print(f"indexnow: submitted {asyncio.run(indexnow.submit_recent())} urls")
+            except Exception as e:
+                print(f"indexnow: skipped ({type(e).__name__}: {e})")
         # After every refresh, auto-list any new circuits without coords.
         print()
         _audit_coords()
