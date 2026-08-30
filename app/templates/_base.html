@@ -99,6 +99,33 @@
   .brand-link { display: inline-flex; align-items: center; line-height: 0; }
   .brand-logo { height: 44px; width: auto; display: block; }
   @media (max-width: 640px) { .brand-logo { height: 34px; } }
+  /* Sister-site strip above the footer. */
+  .sibling-promo { padding: 16px 24px 0; margin-top: auto; }
+  .sp-card {
+    display: flex; align-items: center; gap: 14px; max-width: 860px;
+    margin: 0 auto; padding: 12px 16px; border-radius: 10px;
+    background: var(--card); border: 1px solid var(--line);
+    text-decoration: none; color: inherit;
+    transition: border-color .15s, box-shadow .15s, transform .15s;
+  }
+  .sp-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.10);
+    transform: translateY(-1px);
+  }
+  .sp-icon { border-radius: 9px; flex: 0 0 auto; }
+  .sp-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .sp-head { font-weight: 700; font-size: 14px; color: var(--fg); }
+  .sp-blurb { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+  .sp-cta {
+    margin-left: auto; flex: 0 0 auto; white-space: nowrap;
+    font-size: 12.5px; font-weight: 600; color: var(--accent);
+  }
+  @media (max-width: 640px) {
+    .sibling-promo { padding: 12px 14px 0; }
+    .sp-card { flex-wrap: wrap; gap: 10px; padding: 12px; }
+    .sp-cta { margin-left: 58px; }
+  }
   header .tagline { color: #94a3b8; font-size: 13px; }
   header .tagline a { color: #f8fafc; text-decoration: none; border-bottom: 1px dashed #475569; }
   header .tagline a:hover { color: #fff; border-color: #fff; }
@@ -572,6 +599,7 @@
 
 {% block content %}{% endblock %}
 
+{% include "_sibling_promo.html" %}
 <footer style="text-align:center;padding:10px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;background:var(--card)">
   &copy; {{ now_year }} <a class="brand-gmracing brand-gmracing-dark" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a> &middot; All rights reserved. &middot; <a href="/privacy">Privacy</a> &middot; <a href="#" id="cookie-settings">Cookie settings</a>
   Listings aggregated from public organiser sites; bookings handled by the respective organisers.

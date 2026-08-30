@@ -1,0 +1,17 @@
+{# Sister-site strip, shown above the footer on every page. Deliberately
+   quiet: it reads as a recommendation, not an advert. #}
+{% set _s = sibling() %}
+<aside class="sibling-promo">
+  <a class="sp-card" href="{{ _s.url }}?utm_source=trackdayfinder&amp;utm_medium=sibling"
+     rel="noopener" title="{{ _s.name }} — our sister site">
+    <img class="sp-icon" src="{{ _s.icon }}" alt="" width="44" height="44" loading="lazy">
+    <span class="sp-text">
+      <span class="sp-head">{{ _s.headline }}</span>
+      <span class="sp-blurb">Our sister site
+        {%- if _s.count %} lists <strong>{{ "{:,}".format(_s.count) }}</strong> {{ _s.noun }}.
+        {%- else %} lists every one of the {{ _s.noun }}.{% endif %}
+        {{ _s.detail }}</span>
+    </span>
+    <span class="sp-cta">{{ _s.cta }} &rarr;</span>
+  </a>
+</aside>

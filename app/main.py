@@ -95,6 +95,9 @@ def _breadcrumbs(path: str) -> list[dict]:
 templates.env.globals["breadcrumbs_for"] = _breadcrumbs
 templates.env.globals["canonical_host"] = CANONICAL_HOST
 
+from . import siblings as _siblings  # noqa: E402
+templates.env.globals["sibling"] = _siblings.promo
+
 app = FastAPI(title="TrackdayFinder")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 scheduler = AsyncIOScheduler()
@@ -445,6 +448,13 @@ async def _startup() -> None:
     if MARKETPLACE_ENABLED:
         from . import marketplace as _mkt
         scheduler.add_job(_mkt.expire_past_listings, "cron", hour=2, minute=30, id="expire_listings")
+    # Sibling site's event count for the cross-promo. First run shortly after
+    # boot (not during it), then every six hours; failures are swallowed and
+    # the promo just renders without a number.
+    from datetime import datetime as _dt, timedelta as _td
+    from . import siblings as _sib
+    scheduler.add_job(_sib.refresh, "interval", hours=6, id="sibling_meta",
+                      next_run_time=_dt.now() + _td(seconds=20))
     scheduler.start()
 
 
@@ -2127,6 +2137,19 @@ async def admin_clicks(request: Request, token: Optional[str] = None,
         "now_year": date.today().year,
         "token": token,
     })
+
+
+@app.get("/api/meta")
+async def api_meta():
+    """Public one-line summary of the site. Small and cheap on purpose: our
+    sibling site polls it to show a live trackday count in its cross-promo."""
+    meta = _global_meta()
+    return {
+        "site": "TrackdayFinder",
+        "url": CANONICAL_HOST,
+        "events_upcoming": meta["count"],
+        "last_refresh": meta["last_run"],
+    }
 
 
 @app.get("/api/events")

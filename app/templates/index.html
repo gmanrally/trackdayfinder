@@ -141,7 +141,10 @@
   });
 </script>
 {% else %}
-  <div class="empty">No events match. Try clearing filters.</div>
+  {% set _s = sibling() %}
+  <div class="empty">No events match. Try clearing filters &mdash; or see
+    <a href="{{ _s.url }}?utm_source=trackdayfinder&amp;utm_medium=empty-state" rel="noopener">{{ _s.count and "{:,} ".format(_s.count) or "" }}{{ _s.noun }}</a>
+    on our sister site.</div>
 {% endif %}
 {% endblock %}
 

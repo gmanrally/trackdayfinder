@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="MotorsportEventFinder">
+  <title>MotorsportEventFinder (square icon — rally clock)</title>
+  <rect width="256" height="256" rx="40" fill="#0b1220"/>
+  <rect x="3" y="3" width="250" height="250" rx="38" fill="none" stroke="#1e293b" stroke-width="6"/>
+  <rect x="26" y="14" width="204" height="6" rx="3" fill="#dc2626" opacity="0.55"/>
+  <rect x="26" y="236" width="204" height="6" rx="3" fill="#dc2626" opacity="0.55"/>
+  <g transform="translate(20.0,84.8) scale(1.271)">
+    <rect x="9.9" y="0.9" width="20.2" height="7.2" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="9.9" y="59.9" width="20.2" height="7.2" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="0.9" y="39.4" width="7.2" height="18.7" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="0.9" y="9.9" width="7.2" height="18.7" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="9.9" y="30.4" width="20.2" height="7.2" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="55.5" y="20.3" width="9.0" height="9.0" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="55.5" y="47.7" width="9.0" height="9.0" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="89.9" y="0.9" width="20.2" height="7.2" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="89.9" y="59.9" width="20.2" height="7.2" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="80.9" y="39.4" width="7.2" height="18.7" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="161.9" y="39.4" width="7.2" height="18.7" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="130.9" y="9.9" width="7.2" height="18.7" rx="2" fill="#dc2626" opacity="0.13"/>
+    <rect x="31.9" y="9.9" width="7.2" height="18.7" rx="2" fill="#ff3b30"/>
+    <rect x="31.9" y="39.4" width="7.2" height="18.7" rx="2" fill="#ff3b30"/>
+    <rect x="55.5" y="20.3" width="9.0" height="9.0" rx="2" fill="#ff3b30"/>
+    <rect x="55.5" y="47.7" width="9.0" height="9.0" rx="2" fill="#ff3b30"/>
+    <rect x="111.9" y="9.9" width="7.2" height="18.7" rx="2" fill="#ff3b30"/>
+    <rect x="111.9" y="39.4" width="7.2" height="18.7" rx="2" fill="#ff3b30"/>
+    <rect x="80.9" y="9.9" width="7.2" height="18.7" rx="2" fill="#ff3b30"/>
+    <rect x="89.9" y="30.4" width="20.2" height="7.2" rx="2" fill="#ff3b30"/>
+    <rect x="139.9" y="0.9" width="20.2" height="7.2" rx="2" fill="#ff3b30"/>
+    <rect x="161.9" y="9.9" width="7.2" height="18.7" rx="2" fill="#ff3b30"/>
+    <rect x="139.9" y="59.9" width="20.2" height="7.2" rx="2" fill="#ff3b30"/>
+    <rect x="130.9" y="39.4" width="7.2" height="18.7" rx="2" fill="#ff3b30"/>
+    <rect x="139.9" y="30.4" width="20.2" height="7.2" rx="2" fill="#ff3b30"/>
+  </g>
+</svg>
