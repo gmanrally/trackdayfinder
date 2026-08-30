@@ -124,7 +124,11 @@
   @media (max-width: 640px) {
     .sibling-promo { padding: 12px 14px 0; }
     .sp-card { flex-wrap: wrap; gap: 10px; padding: 12px; }
-    .sp-cta { margin-left: 58px; }
+    /* Keep the icon and headline on one row — flex-basis lets the text
+       sit beside the icon instead of being pushed onto its own line. */
+    .sp-icon { width: 36px; height: 36px; }
+    .sp-text { flex: 1 1 190px; }
+    .sp-cta { flex-basis: 100%; margin-left: 46px; }
   }
   header .tagline { color: #94a3b8; font-size: 13px; }
   header .tagline a { color: #f8fafc; text-decoration: none; border-bottom: 1px dashed #475569; }
@@ -599,7 +603,9 @@
 
 {% block content %}{% endblock %}
 
-{% include "_sibling_promo.html" %}
+{# Everywhere but the map, where the viewport IS the content and a
+   permanent 100px strip would come straight out of the map. #}
+{% if not request.url.path.startswith('/map') %}{% include "_sibling_promo.html" %}{% endif %}
 <footer style="text-align:center;padding:10px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;background:var(--card)">
   &copy; {{ now_year }} <a class="brand-gmracing brand-gmracing-dark" href="https://gmracing.co.uk" target="_blank" rel="noopener">GM<span class="brand-r">R</span>acing.co.uk</a> &middot; All rights reserved. &middot; <a href="/privacy">Privacy</a> &middot; <a href="#" id="cookie-settings">Cookie settings</a>
   Listings aggregated from public organiser sites; bookings handled by the respective organisers.
