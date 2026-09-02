@@ -81,7 +81,7 @@
   .brand-block .brand-link { align-self: flex-start; }
   .brand-block .tagline { padding-right: 4px; line-height: 1.1; }
   header .meta { margin-left: auto; }
-  header nav.top-nav { display: flex; gap: 14px; }
+  header nav.top-nav { display: flex; gap: 14px; flex-wrap: wrap; }
   header nav.top-nav a {
     color: #f8fafc; text-decoration: none; font-weight: 500; font-size: 13px;
     padding: 6px 12px; border-radius: 6px;
@@ -131,7 +131,10 @@
        sit beside the icon instead of being pushed onto its own line. */
     .sp-icon { width: 36px; height: 36px; }
     .sp-text { flex: 1 1 190px; }
-    .sp-cta { flex-basis: 100%; margin-left: 46px; }
+    /* The indent lines the link up under the text, past the icon. It has to
+       come out of the basis as well: 100% plus a margin is wider than the
+       row, which pushed the page sideways and let it scroll horizontally. */
+    .sp-cta { flex-basis: calc(100% - 46px); margin-left: 46px; }
   }
   header .tagline { color: #94a3b8; font-size: 13px; }
   header .tagline a { color: #f8fafc; text-decoration: none; border-bottom: 1px dashed #475569; }
