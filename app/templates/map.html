@@ -154,6 +154,11 @@
     bounds.push([p.lat, p.lng]);
   });
 
-  if (bounds.length) map.fitBounds(bounds, { padding: [40, 40] });
+  // Cap how far fitBounds may go in. Filtering down to one venue gave it a
+  // single point to fit, which it answers with maximum zoom — a marker on a
+  // blank street with nothing around it to say where you are. Zoom 11 keeps
+  // the surrounding area in view, and a wider spread of results still zooms
+  // out past it as normal.
+  if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 11 });
 </script>
 {% endblock %}
