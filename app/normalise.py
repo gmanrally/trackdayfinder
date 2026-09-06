@@ -58,6 +58,9 @@ CIRCUIT_ALIASES = {
     "assen": "TT Circuit Assen",
     "valencia": "Valencia (Ricardo Tormo)",
     "jerez": "Jerez",
+    # Open Pitlane give it as "Circuit Clastres", Europa as "Circuit de
+    # Clastres"; the coords and country tables know it as "Clastres".
+    "clastres": "Clastres",
 }
 
 
