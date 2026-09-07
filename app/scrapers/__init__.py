@@ -6,7 +6,7 @@ from . import (
     pembrey, llandow, kirkistown,
     trackday_solutions, curbstone, lotus_on_track, df_trackdays, skylimit, europa,
     three_sisters, castle_combe, paddock_gt, ventrax, ollies_secret,
-    trackdays_ie, open_pitlane,
+    trackdays_ie, open_pitlane, no_track_limits,
 )
 
 SCRAPERS = {
@@ -42,6 +42,7 @@ SCRAPERS = {
     "ollies_secret": ollies_secret,
     "trackdays_ie": trackdays_ie,
     "open_pitlane": open_pitlane,
+    "no_track_limits": no_track_limits,
 }
 
 # Display names — for the UI Source filter dropdown and the events table.
@@ -80,6 +81,7 @@ ORGANISER_DISPLAY = {
     "ollies_secret": "Ollie's Secret Track Days",
     "trackdays_ie": "Trackdays.ie",
     "open_pitlane": "Open Pitlane Events",
+    "no_track_limits": "No Track Limits",
 }
 
 # Region grouping for the dropdown (UK first, EU after).
@@ -109,4 +111,5 @@ SOURCE_REGION = {
     "kirkistown": "UK",
     "trackdays_ie": "UK",   # RoI — grouped with UK, same as the Mondello circuit mapping
     "open_pitlane": "EU",
+    "no_track_limits": "UK",
 }

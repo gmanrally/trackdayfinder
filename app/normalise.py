@@ -58,6 +58,9 @@ CIRCUIT_ALIASES = {
     "assen": "TT Circuit Assen",
     "valencia": "Valencia (Ricardo Tormo)",
     "jerez": "Jerez",
+    # Bicester Heritage is now Bicester Motion; both, and the bare name,
+    # are the site we already hold coordinates for.
+    "bicester": "Bicester",
     # Open Pitlane give it as "Circuit Clastres", Europa as "Circuit de
     # Clastres"; the coords and country tables know it as "Clastres".
     "clastres": "Clastres",
