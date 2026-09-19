@@ -63,6 +63,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd in ("audit-coords", "audit"):
         return _audit_coords()
+    if cmd == "health":
+        from . import health
+        report = health.run_and_alert()
+        return 1 if report["problems"] else 0
+
     if cmd == "send-digests":
         from . import alerts
         n = alerts.run_digests()

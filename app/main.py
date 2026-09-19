@@ -453,6 +453,12 @@ async def _startup() -> None:
     hour = int(os.environ.get("TRACKDAYFINDER_REFRESH_HOUR", "3"))
     minute = int(os.environ.get("TRACKDAYFINDER_REFRESH_MINUTE", "0"))
     scheduler.add_job(_nightly_refresh, "cron", hour=hour, minute=minute, id="refresh")
+    # An hour after the refresh, check what it did and say so only if
+    # something is wrong. A leaked browser once killed thirty of the
+    # thirty-three scrapers here for four days without anything noticing.
+    from . import health as _health
+    scheduler.add_job(_health.run_and_alert, "cron",
+                      hour=(hour + 1) % 24, minute=minute, id="health")
     # Daily digest at 06:00 — 3 hours after the 03:00 refresh — only when
     # alerts are enabled via env var (otherwise no users to digest anyway).
     if ALERTS_ENABLED:
