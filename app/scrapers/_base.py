@@ -46,21 +46,34 @@ async def get_html_js(url: str, wait_selector: str | None = None, timeout: int =
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        ctx = await browser.new_context(user_agent=UA)
-        page = await ctx.new_page()
-        await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
-        if wait_selector:
+        # Everything after the launch runs under a finally that closes the
+        # browser. page.goto() raises on a slow site, and when it did the
+        # close below was skipped and the Chromium was stranded — leaving
+        # async_playwright() does not reap a browser it did not launch.
+        # Three scrapers timing out nightly leaked five of them, whose
+        # threads then starved the container: every other scraper died on
+        # "can't start new thread", so a timeout in three sources took out
+        # all thirty-three.
+        try:
+            ctx = await browser.new_context(user_agent=UA)
+            page = await ctx.new_page()
+            await page.goto(url, timeout=timeout, wait_until="domcontentloaded")
+            if wait_selector:
+                try:
+                    await page.wait_for_selector(wait_selector, timeout=timeout)
+                except Exception:
+                    pass
+            # Wait for network to settle, then a small extra delay to let any deferred rendering finish.
             try:
-                await page.wait_for_selector(wait_selector, timeout=timeout)
+                await page.wait_for_load_state("networkidle", timeout=timeout)
             except Exception:
                 pass
-        # Wait for network to settle, then a small extra delay to let any deferred rendering finish.
-        try:
-            await page.wait_for_load_state("networkidle", timeout=timeout)
-        except Exception:
-            pass
-        if settle_ms:
-            await page.wait_for_timeout(settle_ms)
-        html = await page.content()
-        await browser.close()
-        return HTMLParser(html)
+            if settle_ms:
+                await page.wait_for_timeout(settle_ms)
+            html = await page.content()
+            return HTMLParser(html)
+        finally:
+            try:
+                await browser.close()
+            except Exception:
+                pass
