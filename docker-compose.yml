@@ -5,6 +5,12 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8766:8766"   # only expose to localhost; nginx terminates TLS
+    # Run tini as PID 1. Without it PID 1 is uvicorn, and python does not
+    # reap orphaned children: every browser Playwright leaves behind stays
+    # as a zombie holding a pid-cgroup slot. 57 had built up against a
+    # pids.max of 4652, and exhausting that ceiling is what killed thirty
+    # of thirty-three scrapers with "can't start new thread".
+    init: true
     volumes:
       - trackdayfinder_data:/data  # persistent SQLite + debug dumps
     environment:

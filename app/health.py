@@ -40,6 +40,9 @@ MIN_FAILURES = int(os.environ.get("HEALTH_MIN_FAILURES", "3"))
 FAIL_FRACTION = float(os.environ.get("HEALTH_FAIL_FRACTION", "0.10"))
 # One browser may legitimately be mid-scrape. Several are strays.
 MAX_BROWSERS = int(os.environ.get("HEALTH_MAX_BROWSERS", "2"))
+# Unreaped exits are survivable in ones and tens; it is the slow climb
+# toward the pid ceiling that eventually takes the container down.
+MAX_ZOMBIES = int(os.environ.get("HEALTH_MAX_ZOMBIES", "200"))
 
 
 def _registered() -> set[str]:
@@ -73,27 +76,57 @@ def _last_success_per_source() -> dict[str, datetime]:
     return out
 
 
-def _stray_browsers() -> int:
-    """Browser processes alive in this container.
+def _browser_procs() -> tuple[int, int]:
+    """(running, zombie) browser processes in this container.
 
     Read from /proc rather than by shelling out, so it costs nothing and
-    works in the slim container. Not available off Linux, where it simply
-    reports none and the check passes.
+    works in the slim container. Not available off Linux, where it reports
+    none and both checks pass.
+
+    The split matters, because the two counts mean different things and the
+    first version of this conflated them and cried wolf. A *running* browser
+    nobody closed is the leak this was written for. A *zombie* is a browser
+    that did exit, whose parent never reaped it — PID 1 here is uvicorn, and
+    python as PID 1 does not reap orphans, so every browser Playwright
+    abandons leaves a permanent entry behind. Zombies hold no memory and no
+    threads, so they are not an emergency, but they each hold a slot in the
+    container's pid cgroup: 57 of them had accumulated against a pids.max of
+    4652, and that ceiling is what the container hit the night thirty of
+    thirty-three scrapers died on "can't start new thread".
     """
     proc = Path("/proc")
     if not proc.is_dir():
-        return 0
-    found = 0
+        return 0, 0
+    running = zombie = 0
     for entry in proc.iterdir():
         if not entry.name.isdigit():
             continue
         try:
             name = (entry / "comm").read_text(errors="ignore").strip()
-        except OSError:
+            if "chrome" not in name.lower() and "firefox" not in name.lower():
+                continue
+            # /proc/<pid>/stat: the comm field is parenthesised and may itself
+            # contain spaces, so split after the closing bracket. State is the
+            # first field that follows.
+            state = (entry / "stat").read_text().rsplit(")", 1)[1].split()[0]
+        except (OSError, IndexError):
             continue                          # process went away mid-scan
-        if "chrome" in name.lower() or "firefox" in name.lower():
-            found += 1
-    return found
+        if state == "Z":
+            zombie += 1
+        else:
+            running += 1
+    return running, zombie
+
+
+def _pids_max() -> Optional[int]:
+    """The container's pid ceiling, when the cgroup exposes one."""
+    for p in ("/sys/fs/cgroup/pids.max", "/sys/fs/cgroup/pids/pids.max"):
+        try:
+            raw = Path(p).read_text().strip()
+        except OSError:
+            continue
+        return None if raw == "max" else int(raw)
+    return None
 
 
 def check() -> dict:
@@ -123,11 +156,18 @@ def check() -> dict:
             f"{len(stale)} sources have not succeeded in {STALE_DAYS} days: "
             + ", ".join(stale[:12]) + (" …" if len(stale) > 12 else ""))
 
-    browsers = _stray_browsers()
+    browsers, zombies = _browser_procs()
     if browsers > MAX_BROWSERS:
         problems.append(
             f"{browsers} browser processes still running — a JS scrape is "
             f"leaking them, which starves the container")
+    limit = _pids_max()
+    if zombies > MAX_ZOMBIES or (limit and zombies > limit * 0.5):
+        problems.append(
+            f"{zombies} browser processes have exited without being reaped"
+            + (f" (of {limit} pids this container may hold)" if limit else "")
+            + " — PID 1 is not an init, so they accumulate until nothing new "
+              "can start. Add `init: true` to the compose service")
 
     with session() as s:
         upcoming = len(s.exec(select(Event).where(
@@ -140,6 +180,7 @@ def check() -> dict:
         "failed": failed,
         "stale": stale,
         "browsers": browsers,
+        "zombies": zombies,
         "upcoming": upcoming,
     }
 
