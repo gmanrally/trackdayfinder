@@ -5,7 +5,14 @@ httpx>=0.27
 selectolax>=0.3.21
 playwright==1.59.0
 python-dateutil>=2.9
-sqlmodel>=0.0.16
+# Pinned, not floating. 0.0.45 refuses to write a naive datetime
+# ("Datetime values must have timezone information"), and every model here
+# defaults its timestamps with datetime.utcnow(). A rebuild picked it up on
+# 2026-09-21 and every scrape run failed on its own ScrapeRun insert while the
+# site stayed up serving reads, which is the hardest kind of break to notice.
+# 0.0.42 is what the sister site runs. Moving off it means making the models
+# tz-aware and migrating the timestamps already in the database.
+sqlmodel==0.0.42
 apscheduler>=3.10
 rapidfuzz>=3.6
 python-multipart>=0.0.9
