@@ -15,8 +15,7 @@ import re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Optional
-import httpx
-from ._base import RawEvent, UA
+from ._base import RawEvent, get_json
 
 SOURCE_SLUG = "trackdays_ie"
 ORGANISER = "Trackdays.ie"
@@ -106,12 +105,10 @@ def _circuit_from(text: str) -> Optional[str]:
 
 async def fetch() -> list[RawEvent]:
     DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-    async with httpx.AsyncClient(headers={"User-Agent": UA}, timeout=20.0,
-                                 follow_redirects=True) as c:
-        r = await c.get(PRODUCTS_URL)
-        r.raise_for_status()
-        data = r.json()
-    (DEBUG_DIR / "trackdays_ie.json").write_text(r.text, encoding="utf-8", errors="ignore")
+    # Shared fetcher so a Shopify rate limit is waited out rather than
+    # reported as a dead source: this shop 429'd for about a day solid.
+    data, body = await get_json(PRODUCTS_URL)
+    (DEBUG_DIR / "trackdays_ie.json").write_text(body, encoding="utf-8", errors="ignore")
 
     out: list[RawEvent] = []
     for p in data.get("products", []):

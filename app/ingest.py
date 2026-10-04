@@ -210,11 +210,26 @@ def _check_source_health(slug: str, n: int, err: str | None) -> bool:
             Event.source.in_(slugs), Event.event_date >= today).limit(1)).first()
         if upcoming is None:
             return False
+        # runs[0] is the run we are in, which we already know returned 0.
+        # Alert on the SECOND consecutive empty run, not the first: watched
+        # sources are scraped hourly and a single empty parse is usually the
+        # site being slow or mid-deploy rather than broken. Castle Combe
+        # returned 0 once, sent an email, and was back to its usual 4 an hour
+        # later. The failure this watchdog exists for — a redesign that
+        # quietly breaks a parser — does not fix itself in an hour, so the
+        # only cost is an hour's delay on a real one.
+        #
+        # So the shape that alerts is: a working run, then empty, then empty.
+        # Requiring the run before last to have found events is also what
+        # keeps this to one email per outage rather than one per hour.
         runs = s.exec(select(ScrapeRun).where(ScrapeRun.source == slug)
-                      .order_by(ScrapeRun.started_at.desc()).limit(2)).all()
+                      .order_by(ScrapeRun.started_at.desc()).limit(3)).all()
         prev = runs[1] if len(runs) > 1 else None
-        if prev is None or (prev.n_events or 0) == 0:
-            return False   # already broken (alerted on the edge) or no history
+        before = runs[2] if len(runs) > 2 else None
+        if prev is None or (prev.n_events or 0) != 0:
+            return False   # not yet two empty runs in a row
+        if before is None or (before.n_events or 0) == 0:
+            return False   # already alerted on this outage, or no history
         n_upcoming = len(s.exec(select(Event).where(
             Event.source.in_(slugs), Event.event_date >= today)).all())
     try:
@@ -226,8 +241,9 @@ def _check_source_health(slug: str, n: int, err: str | None) -> bool:
             <p><strong>{slug}</strong> just scraped 0 events, but the database
             still holds {n_upcoming} upcoming events for it — from here they go
             stale and their booking links may be dead.</p>
-            <p>The previous run ({prev.started_at:%Y-%m-%d %H:%M}) returned
-            {prev.n_events} events, so the site has probably been restructured
+            <p>The last run that found anything ({before.started_at:%Y-%m-%d %H:%M})
+            returned {before.n_events} events, and the two runs since have
+            found none, so the site has probably been restructured
             and the parser needs updating.</p>
             <p>Ongoing state: /admin/health</p>
             """,
