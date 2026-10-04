@@ -2,7 +2,12 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 jinja2>=3.1
 httpx>=0.27
-selectolax>=0.3.21
+# Pinned, not floating. selectolax 1.0 removed the Modest backend that
+# `from selectolax.parser import HTMLParser` uses, and raises ImportError
+# on import — so a rebuild took the whole site to a 502 restart loop, not
+# just one scraper. 0.4.12 is what the sister site runs. Moving off it
+# means porting every scraper to selectolax.lexbor.LexborHTMLParser.
+selectolax==0.4.12
 playwright==1.59.0
 python-dateutil>=2.9
 # Pinned, not floating. 0.0.45 refuses to write a naive datetime
