@@ -137,6 +137,15 @@
     font-size: 12.5px; font-weight: 600; color: var(--accent);
   }
   @media (max-width: 640px) {
+    /* Above the footer is a desktop placement. It works there because the
+       table has its own scroll box, so the footer and these two cards are on
+       screen the whole time. On a phone the table scrolls with the page and
+       the list IS the page — the strip sat ~130 screenfuls down and nobody
+       ever saw it. body is a flex column and these are direct children, so
+       the strip moves under the header on small screens with no change to
+       the markup and none to the desktop layout. */
+    header { order: -2; }
+    .sibling-promo { order: -1; }
     .sibling-promo { padding: 12px 14px 0; }
     .sp-card { flex-wrap: wrap; gap: 10px; padding: 12px; }
     /* Keep the icon and headline on one row — flex-basis lets the text
