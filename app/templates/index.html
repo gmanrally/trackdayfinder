@@ -111,16 +111,52 @@
         loading = false;
       }
     }
+    // Auto-load a few windows, then ask. Loading for ever on scroll means the
+    // bottom of the page can never be reached: the sentinel sits above the
+    // footer, so scrolling towards the footer fetches another month and pushes
+    // it further away. On a desktop that is invisible, because the table has
+    // its own scroll box and the footer sits outside it. On a phone the table
+    // scrolls with the page, and the result was a 70,000px document — about
+    // 80 screenfuls — whose footer, sister-site card, shop card, privacy link
+    // and cookie settings were all unreachable by scrolling.
+    const AUTO_LOADS = 3;              // ~4 months before we stop and ask
+    let autoLoaded = 0;
+
+    function asButton() {
+      sentinel.textContent = 'Load more events';
+      sentinel.setAttribute('role', 'button');
+      sentinel.setAttribute('tabindex', '0');
+      sentinel.style.cursor = 'pointer';
+      sentinel.style.color = 'var(--accent)';
+      sentinel.style.fontWeight = '600';
+    }
+
+    function manualLoad() {
+      if (exhausted) return;
+      sentinel.textContent = 'Loading more events…';
+      sentinel.style.color = 'var(--muted)';
+      sentinel.style.fontWeight = '';
+      loadMore().then(() => { if (!exhausted) asButton(); });
+    }
+
+    sentinel.addEventListener('click', manualLoad);
+    sentinel.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); manualLoad(); }
+    });
+
     if ('IntersectionObserver' in window) {
       const io = new IntersectionObserver((entries) => {
-        if (entries.some(e => e.isIntersecting)) loadMore();
+        if (!entries.some(e => e.isIntersecting)) return;
+        if (autoLoaded >= AUTO_LOADS) { io.disconnect(); if (!exhausted) asButton(); return; }
+        autoLoaded += 1;
+        loadMore().then(() => {
+          if (exhausted) io.disconnect();
+          else if (autoLoaded >= AUTO_LOADS) { io.disconnect(); asButton(); }
+        });
       }, { rootMargin: '600px' });
       io.observe(sentinel);
     } else {
-      // Older browsers: just load everything in one go on click.
-      sentinel.style.cursor = 'pointer';
-      sentinel.textContent = 'Load more events';
-      sentinel.addEventListener('click', loadMore);
+      asButton();            // older browsers: tap to load, same as above
     }
   })();
 
