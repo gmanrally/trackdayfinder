@@ -107,10 +107,13 @@
   /* The sister site and the shop sit side by side on a wide screen and stack
      on a narrow one. Both are the same card; only the GMR one carries a
      picture, because a part is worth showing and a website is not. */
-  .promo-row { display: flex; gap: 12px; max-width: 860px; margin: 0 auto;
-    flex-wrap: wrap; }
-  .promo-row > .sp-card { flex: 1 1 380px; max-width: none; margin: 0; }
-  .gmr-shot { width: 64px; height: 64px; object-fit: contain; flex: 0 0 auto; }
+  /* 860px was the single card's width and far too narrow for two: each got
+     ~420px, which wrapped the sister site's headline over three lines while
+     the table beside it ran the full width of the screen. */
+  .promo-row { display: flex; gap: 16px; max-width: 1200px; margin: 0 auto;
+    flex-wrap: wrap; align-items: stretch; }
+  .promo-row > .sp-card { flex: 1 1 440px; max-width: none; margin: 0; }
+  .gmr-shot { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; }
   .gmr-kicker { font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
     font-weight: 700; color: var(--muted); }
   .sp-card {
