@@ -104,6 +104,15 @@
   @media (max-width: 640px) { .brand-logo { height: 34px; } }
   /* Sister-site strip above the footer. */
   .sibling-promo { padding: 16px 24px 0; margin-top: auto; }
+  /* The sister site and the shop sit side by side on a wide screen and stack
+     on a narrow one. Both are the same card; only the GMR one carries a
+     picture, because a part is worth showing and a website is not. */
+  .promo-row { display: flex; gap: 12px; max-width: 860px; margin: 0 auto;
+    flex-wrap: wrap; }
+  .promo-row > .sp-card { flex: 1 1 380px; max-width: none; margin: 0; }
+  .gmr-shot { width: 64px; height: 64px; object-fit: contain; flex: 0 0 auto; }
+  .gmr-kicker { font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+    font-weight: 700; color: var(--muted); }
   .sp-card {
     display: flex; align-items: center; gap: 14px; max-width: 860px;
     margin: 0 auto; padding: 12px 16px; border-radius: 10px;
@@ -680,5 +689,6 @@
     <button type="button" id="cookie-accept" class="cookie-btn cookie-accept">Accept</button>
   </div>
 </div>
+<script src="/static/gmr-promo.js" defer></script>
 </body>
 </html>

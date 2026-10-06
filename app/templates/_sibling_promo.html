@@ -2,6 +2,7 @@
    quiet: it reads as a recommendation, not an advert. #}
 {% set _s = sibling() %}
 <aside class="sibling-promo">
+  <div class="promo-row">
   <a class="sp-card" href="{{ _s.url }}?utm_source=trackdayfinder&amp;utm_medium=sibling"
      rel="noopener" title="{{ _s.name }} — our sister site">
     <img class="sp-icon" src="{{ _s.icon }}" alt="" width="44" height="44" loading="lazy">
@@ -14,4 +15,7 @@
     </span>
     <span class="sp-cta">{{ _s.cta }} &rarr;</span>
   </a>
+  {# our own shop, beside the sister site and labelled as ours #}
+  {% include "_partner_promo.html" %}
+  </div>
 </aside>

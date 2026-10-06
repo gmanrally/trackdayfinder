@@ -107,6 +107,8 @@ templates.env.globals["canonical_host"] = CANONICAL_HOST
 
 from . import siblings as _siblings  # noqa: E402
 templates.env.globals["sibling"] = _siblings.promo
+from . import partner as _partner  # noqa: E402
+templates.env.globals["gmr_promo"] = _partner.promo
 
 app = FastAPI(title="TrackdayFinder")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")

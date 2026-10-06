@@ -1,0 +1,20 @@
+{# GM Racing card, shown beside the sister-site strip. Same shape as the
+   sibling card so the pair read as one quiet row rather than an advert
+   bolted onto a recommendation.
+
+   The label is not decoration: the same person builds this site and the
+   shop, and saying so is what separates this from an undisclosed ad. #}
+{% set _p = gmr_promo() %}
+{% if _p %}
+<a class="sp-card gmr-card" href="{{ _p.url }}" rel="noopener"
+   title="GM Racing — the shop behind this site">
+  <img class="gmr-shot" src="{{ _p.still }}" data-anim="{{ _p.anim }}" alt=""
+       width="64" height="64" loading="lazy" decoding="async">
+  <span class="sp-text">
+    <span class="gmr-kicker">From the creator of this website</span>
+    <span class="sp-head">{{ _p.head }}</span>
+    <span class="sp-blurb">{{ _p.blurb }}</span>
+  </span>
+  <span class="sp-cta">See the kit &rarr;</span>
+</a>
+{% endif %}
