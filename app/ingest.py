@@ -36,7 +36,11 @@ def prune_scrape_runs() -> int:
     cutoff = datetime.utcnow() - timedelta(days=RUN_RETENTION_DAYS)
     with session() as s:
         keep: set[int] = set()
-        for (src,) in s.exec(select(ScrapeRun.source).distinct()).all() or []:
+        # exec() on a single-column select yields bare scalars, not 1-tuples,
+        # so unpacking them as rows shreds each string into its characters.
+        sources = [r if isinstance(r, str) else r[0]
+                   for r in s.exec(select(ScrapeRun.source).distinct()).all()]
+        for src in sources:
             recent = s.exec(select(ScrapeRun.id)
                             .where(ScrapeRun.source == src)
                             .order_by(ScrapeRun.started_at.desc())
