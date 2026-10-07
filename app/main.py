@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import time
 import os
 import re
 from datetime import date, datetime, timedelta
@@ -52,17 +54,41 @@ templates = Jinja2Templates(directory=str(BASE / "templates"))
 templates.env.filters["slugify"] = slugify
 
 
+_META_TTL = 30.0                     # seconds; both numbers move slowly
+_meta_cache: "tuple[float, dict] | None" = None
+
+
 def _global_meta() -> dict:
-    """Total upcoming events + last refresh time — exposed to every template."""
+    """Total upcoming events + last refresh time — exposed to every template.
+
+    The `.limit(1)` is load-bearing, not tidiness. Without it,
+    `select(ScrapeRun).order_by(...)` followed by `.first()` fetched the whole
+    scraperun table and built an ORM object for every row before discarding
+    all but one. This site scrapes hourly, so that table had grown to 19,456
+    rows, and the base template asks for this twice per page: 38,912 model
+    instances to print one timestamp. It cost roughly 900ms on EVERY templated
+    page — the privacy page, which has no events on it at all, took as long as
+    the event list. Only /robots.txt, which renders no template, was quick.
+
+    The cache is the second half: two calls per render become one, and a burst
+    of requests shares the result.
+    """
+    global _meta_cache
+    now = time.monotonic()
+    if _meta_cache is not None and now - _meta_cache[0] < _META_TTL:
+        return _meta_cache[1]
     from sqlmodel import func
     today = date.today()
     with db_session() as s:
         n = s.exec(select(func.count(Event.id)).where(Event.event_date >= today)).one()
-        last = s.exec(select(ScrapeRun).order_by(ScrapeRun.finished_at.desc())).first()
-    return {
+        last = s.exec(select(ScrapeRun).order_by(ScrapeRun.finished_at.desc())
+                      .limit(1)).first()
+    out = {
         "count": n if isinstance(n, int) else (n[0] if n else 0),
         "last_run": last.finished_at.strftime("%Y-%m-%d %H:%M") if last and last.finished_at else None,
     }
+    _meta_cache = (now, out)
+    return out
 
 templates.env.globals["global_meta"] = _global_meta
 templates.env.globals["alerts_enabled"] = ALERTS_ENABLED
