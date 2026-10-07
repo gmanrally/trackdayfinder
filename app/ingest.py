@@ -17,6 +17,39 @@ STALE_PRUNE_DAYS = 14
 MIN_EVENTS_TO_PRUNE = 3
 
 
+# Scrape-run history. Nothing reads a run older than a day or two —
+# /admin/health shows the latest per source and the zero-events watchdog looks
+# at the last three — but the table was never trimmed, so it had grown to
+# 19,456 rows since May at 562 runs a day. That is the table _global_meta was
+# hydrating in full to print one timestamp, which is how a latent query bug
+# became a 900ms tax on every page. Keeping it small keeps that class of
+# mistake cheap.
+RUN_RETENTION_DAYS = int(os.environ.get("RUN_RETENTION_DAYS", "30"))
+RUN_KEEP_PER_SOURCE = 5
+
+
+def prune_scrape_runs() -> int:
+    """Drop scrape-run history past the retention window, but always keep the
+    most recent few runs for each source however old they are — a source that
+    has gone quiet must still have enough history for the watchdog to judge
+    it, rather than looking brand new for ever."""
+    cutoff = datetime.utcnow() - timedelta(days=RUN_RETENTION_DAYS)
+    with session() as s:
+        keep: set[int] = set()
+        for (src,) in s.exec(select(ScrapeRun.source).distinct()).all() or []:
+            recent = s.exec(select(ScrapeRun.id)
+                            .where(ScrapeRun.source == src)
+                            .order_by(ScrapeRun.started_at.desc())
+                            .limit(RUN_KEEP_PER_SOURCE)).all()
+            keep.update(r if isinstance(r, int) else r[0] for r in recent)
+        stmt = sql_delete(ScrapeRun).where(ScrapeRun.started_at < cutoff)
+        if keep:
+            stmt = stmt.where(ScrapeRun.id.notin_(keep))
+        n = s.exec(stmt).rowcount or 0
+        s.commit()
+    return n
+
+
 def _prune_stale(source: str) -> int:
     """Delete upcoming events from `source` whose last_seen is older than
     STALE_PRUNE_DAYS. Returns number deleted. Safe to call repeatedly."""

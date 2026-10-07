@@ -463,6 +463,12 @@ async def _nightly_refresh() -> None:
     they must never make the refresh look like it failed."""
     await ingest.run_all()
     try:
+        n = ingest.prune_scrape_runs()
+        if n:
+            print(f"[prune] dropped {n} scrape-run rows past retention")
+    except Exception as e:                      # never fail the refresh over history
+        print(f"[prune] skipped: {type(e).__name__}: {e}")
+    try:
         from . import indexnow
         n = await indexnow.submit_recent()
         print(f"[indexnow] submitted {n} urls")
@@ -499,8 +505,16 @@ async def _startup() -> None:
         # has confirmed watches). Urgent kinds mail immediately; "new event"
         # alerts stay on the 06:00 digest. TRACKDAYFINDER_WATCH_REFRESH=0 disables.
         if os.environ.get("TRACKDAYFINDER_WATCH_REFRESH", "1").strip() != "0":
+            # Every three hours, not hourly. This is meant to be a targeted
+            # re-scrape of just the sources carrying a watched event, but one
+            # user watching every source makes it a full site scrape — 562 a
+            # day. In five months it produced 35 alerts (low_stock, reopened,
+            # price_drop); the 2,896 "new event" ones come from the nightly
+            # run and the daily digest instead. It also rate-limited two
+            # Shopify sources into 429s for a day each. Six runs a day still
+            # catches a price drop or a sell-out the same day.
             scheduler.add_job(ingest.refresh_watched, "cron",
-                              hour="7-22", minute=15, id="watch_refresh")
+                              hour="7-22/3", minute=15, id="watch_refresh")
     # Grey out marketplace listings whose event date has passed.
     if MARKETPLACE_ENABLED:
         from . import marketplace as _mkt
