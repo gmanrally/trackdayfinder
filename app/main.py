@@ -609,7 +609,25 @@ async def index(request: Request,
             if isinstance(total_count, tuple):
                 total_count = total_count[0]
 
-        all_events = s.exec(select(Event).where(Event.event_date >= today)).all()
+        # Only the columns the filter chips are built from. This used to be
+
+        # select(Event), which hydrated every upcoming event into a full ORM
+
+        # object — forty-odd columns each, 771 of them — so that six fields
+
+        # could be read off them to populate some dropdowns. Selecting the
+
+        # columns returns lightweight rows that still answer e.circuit and
+
+        # friends, so nothing downstream changes.
+
+        all_events = s.exec(select(
+
+            Event.circuit, Event.region, Event.session, Event.source,
+
+            Event.vehicle_type, Event.event_date,
+
+        ).where(Event.event_date >= today)).all()
 
         # Build the Circuit dropdown so it ONLY shows circuits that have at
         # least one event matching the *currently active* Source/Vehicle/Session
@@ -657,7 +675,6 @@ async def index(request: Request,
         sources_grouped = [g for g in sources_grouped if g[1]]
         sessions = sorted({e.session for e in all_events if e.session})
         months = _build_month_choices(all_events)
-        last = s.exec(select(ScrapeRun).order_by(ScrapeRun.finished_at.desc())).first()
 
     # Event ids that have a space for sale — badges the row on the main list.
     listing_event_ids: set[int] = set()
@@ -678,7 +695,13 @@ async def index(request: Request,
         "months": months,
         "countries": countries_list,
         "weekday_choices": WEEKDAY_CHOICES,
-        "last_run": last.finished_at.strftime("%Y-%m-%d %H:%M") if last and last.finished_at else None,
+        # Reuse the cached value rather than asking again. The query that
+        # used to sit here was the same unlimited select(ScrapeRun) as
+        # _global_meta had, and it hydrated all 10,859 rows of scrape
+        # history into ORM objects on every page of the event list — 97% of
+        # the objects this route created, to print one timestamp it already
+        # had to hand.
+        "last_run": _global_meta()["last_run"],
         "now_year": today.year,
         "today_iso": today.isoformat(),
         "sort": sort_key,
