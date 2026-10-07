@@ -1,22 +1,24 @@
-// Swap the GMR card's still for its turntable.
+// Swap the GMR card's still for its turntable, with nothing asked of the
+// viewer.
 //
-// The animation is ~234KB and the still is a few, so loading it on every page
-// view to advertise a part most visitors will not look at is not a trade worth
-// making. It is fetched once, on a signal that the viewer might actually care.
+// This started out hover-to-play, to avoid spending ~234KB advertising a part
+// most visitors would not look at. Two things settled it the other way. On a
+// touch screen there is no hover at all, so mouseenter never fired and the
+// card was simply a still image on every phone. And once the strip moved above
+// the list on small screens, the card is on the opening screen anyway — so a
+// turntable that waits to be asked is a turntable nobody sees.
 //
-// What counts as that signal depends on the device. With a mouse it is hover:
-// a deliberate act, and cheap to wait for. On a touch screen there is no
-// hover, and mouseenter simply never fires — which is why the card sat still
-// on every phone. There the signal is the card being on screen, which on a
-// phone it now is, because the strip moved above the list.
+// So it plays on its own, on every device, and keeps turning. The fetch is
+// still tied to the card being on screen, which costs nothing where it is
+// visible immediately and saves the download on any page where it is not.
 //
-// That makes the fetch near-certain on mobile, so the cheap-data cases are
-// checked first and skipped outright: a viewer who has asked for less motion
-// or less data gets the still, which is the whole advert anyway — the part,
-// lit the same way, just not turning.
+// Two signals still hold it back, both sent deliberately by the viewer's own
+// browser: a reduced-motion preference, and Save-Data or a 2g connection.
+// Those get the still, which is the same part under the same lighting — it
+// loses the rotation, not the advert.
 (function () {
-  var cards = document.querySelectorAll('.gmr-shot[data-anim]');
-  if (!cards.length) return;
+  var shots = document.querySelectorAll('.gmr-shot[data-anim]');
+  if (!shots.length) return;
 
   function unwanted() {
     try {
@@ -30,59 +32,32 @@
     return false;
   }
 
-  // Two turns at six seconds each, then back to the still. A loop that never
-  // stops is fine under a cursor that chose it; parked at the top of a phone
-  // screen it is just something moving while you are trying to read.
-  var REST_AFTER_MS = 12000;
-
-  cards.forEach(function (img) {
+  shots.forEach(function (img) {
     var card = img.closest('.gmr-card') || img;
     var still = img.src;
     var anim = img.dataset.anim;
-    var loaded = false, playing = false, restTimer = null;
-
-    function rest() {
-      playing = false;
-      img.src = still;
-    }
+    var started = false;
 
     function play() {
-      if (playing || unwanted()) return;
-      playing = true;
-      clearTimeout(restTimer);
-      if (loaded) {                       // already fetched: just show it again
-        img.src = anim;
-        restTimer = setTimeout(rest, REST_AFTER_MS);
-        return;
-      }
+      if (started || unwanted()) return;
+      started = true;
+      // Decode first, then swap, so the card never blinks through a
+      // half-loaded frame or an empty box on a slow connection.
       var pre = new Image();
-      pre.onload = function () {
-        loaded = true;
-        img.src = anim;
-        restTimer = setTimeout(rest, REST_AFTER_MS);
-      };
-      pre.onerror = function () { playing = false; };   // keep the still
+      pre.onload = function () { img.src = anim; };
+      pre.onerror = function () { started = false; };   // keep the still
       pre.src = anim;
     }
 
-    var hoverable = false;
-    try {
-      hoverable = window.matchMedia('(hover: hover)').matches;
-    } catch (e) { hoverable = true; }     // assume a cursor if we cannot tell
-
-    if (hoverable) {
-      card.addEventListener('mouseenter', play);
-      card.addEventListener('focus', play, true);
-    } else if ('IntersectionObserver' in window) {
+    if ('IntersectionObserver' in window) {
       var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (e) {
-          if (e.isIntersecting) play();
-          else { clearTimeout(restTimer); rest(); }   // off screen: stop paying for it
-        });
-      }, { threshold: 0.5 });
+        if (!entries.some(function (e) { return e.isIntersecting; })) return;
+        play();
+        io.disconnect();          // fetched once; it loops on its own from here
+      }, { threshold: 0 });
       io.observe(card);
     } else {
-      play();                             // old touch browser: just show it
+      play();
     }
   });
 })();
