@@ -11,8 +11,10 @@ from .circuit_noise import CIRCUIT_STATIC_NOISE_DB
 
 # Stale-event guardrails. After a successful per-source scrape we delete
 # upcoming events from that source whose last_seen is older than this many
-# days. Skipped entirely when the scrape returned fewer than MIN_EVENTS_TO_PRUNE
-# events — a transient outage shouldn't wipe everything.
+# days; it runs after any successful scrape, however few events that scrape
+# found, because fourteen days of absence is itself the protection against a
+# transient problem. MIN_EVENTS_TO_PRUNE guards only the immediate delta-prune,
+# where a partial scrape really could wipe live listings in one pass.
 STALE_PRUNE_DAYS = 14
 MIN_EVENTS_TO_PRUNE = 3
 
@@ -200,7 +202,19 @@ async def run_one(slug: str) -> tuple[int, str | None]:
         if n >= MIN_EVENTS_TO_PRUNE:
             for ev_src in (emitted_sources or {slug}):
                 _delta_prune(ev_src, run_start)
-                _prune_stale(ev_src)
+        # The 14-day backstop runs whatever the count. It used to sit behind
+        # the same guard, which quietly meant a source could never drop a
+        # stale row at all: the count gate exists so a partial scrape cannot
+        # wipe live listings, but fourteen days of absence is itself that
+        # protection, and the gate turned "small source" into "exempt for
+        # ever". Eight sources were in that state — the ones that legitimately
+        # list one or two days, plus any that had run out. Open Pitlane kept
+        # advertising a 5 November trackday the organiser deleted on 27
+        # September, and would have done so until the date passed, because
+        # their calendar is empty and an empty scrape can never reach a gate
+        # that wants three events.
+        for ev_src in (emitted_sources or {slug}):
+            _prune_stale(ev_src)
     except Exception as e:
         err = f"{type(e).__name__}: {e}"
         run.error = err
