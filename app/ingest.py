@@ -294,8 +294,11 @@ def _check_source_health(slug: str, n: int, err: str | None) -> bool:
             stale and their booking links may be dead.</p>
             <p>The last run that found anything ({before.started_at:%Y-%m-%d %H:%M})
             returned {before.n_events} events, and the two runs since have
-            found none, so the site has probably been restructured
-            and the parser needs updating.</p>
+            found none.</p>
+            <p>Usually that is a site restructure that broke the parser — but
+            check the organiser's calendar before assuming it, because a
+            source that has simply run out of dates looks identical from
+            here, and the fix then is nothing at all.</p>
             <p>Ongoing state: /admin/health</p>
             """,
         )
