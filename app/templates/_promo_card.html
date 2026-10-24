@@ -1,14 +1,20 @@
-{# The card-view twin of _promo_row.html. Same disclosure, same product, shaped
-   like the event cards around it so it sits in the grid rather than breaking
-   it — but tinted and labelled so nobody mistakes it for a trackday. #}
+{# The card-view twin of _promo_row.html.
+
+   Built on .space-card, the same skeleton every event card uses, so it sits
+   in the grid at the right width. The first version invented a class that
+   existed nowhere, which on a phone - where cards are the default view -
+   rendered the advert as nothing at all.
+
+   Tinted and labelled rather than disguised: in a grid of events it has to be
+   obvious at a glance that this one is not an event. #}
 {% set _p = gmr_promo(promo_slot | default(0)) %}
 {% if _p %}
-<a class="ev-card list-ad-card" href="{{ _p.url }}" rel="noopener" data-promo="gmr">
+<a class="space-card list-ad-card" href="{{ _p.url }}" rel="noopener" data-promo="gmr">
   <span class="list-ad-kicker">From the workshop behind this site</span>
-  <img class="list-ad-shot" src="{{ _p.still }}" data-anim="{{ _p.anim }}" alt="" width="64" height="64"
-       loading="lazy" decoding="async">
+  <img class="list-ad-shot" src="{{ _p.still }}" data-anim="{{ _p.anim }}" alt=""
+       width="72" height="72" loading="lazy" decoding="async">
   <span class="list-ad-head">{{ _p.head }}</span>
   <span class="list-ad-blurb">{{ _p.blurb }}</span>
-  <span class="list-ad-cta">See the kit &rarr;</span>
+  <span class="sc-cta list-ad-cta">See the kit &rarr;</span>
 </a>
 {% endif %}

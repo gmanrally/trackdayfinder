@@ -110,6 +110,24 @@ def main() -> int:
     if n0 != evs // every:
         bad.append("chunk from zero: expected %d, got %d" % (evs // every, n0))
 
+    # --- the card view, which is what a phone gets by default --------------
+    cv = client.get("/", params={"view": "cards"})
+    card = re.search(r'<a class="([^"]*list-ad-card[^"]*)"', cv.text)
+    classes = card.group(1).split() if card else []
+    print("  card view ............... %d promo card(s), classes: %s"
+          % (cv.text.count('data-promo="gmr"'), " ".join(classes) or "(none)"))
+    if cv.status_code != 200:
+        bad.append("the card view returned %s" % cv.status_code)
+    if not card:
+        bad.append("no promo card in the card view")
+    elif "space-card" not in classes:
+        # A class that exists nowhere has no layout: on a phone, where cards are
+        # the default, the advert renders as nothing at all.
+        bad.append("the promo card is not built on .space-card, so it has no "
+                   "layout: %s" % classes)
+    if card and "data-anim=" not in cv.text:
+        bad.append("the card image carries no data-anim")
+
     # --- different products in consecutive slots ---------------------------
     a, b = partner.promo(1), partner.promo(2)
     print("  slot 1 vs slot 2 ........ %r / %r"

@@ -141,8 +141,14 @@
     flex: 1 1 240px; min-width: 0; }
   .list-ad-cta { flex: 0 0 auto; white-space: nowrap; color: var(--accent);
     font-size: clamp(12.5px, 0.9vw, 14px); font-weight: 600; }
-  .list-ad-card { display: flex; flex-direction: column; gap: 4px;
-    background: var(--card); text-decoration: none; color: inherit; }
+  /* Card view. Inherits .space-card, so only the advert-specific bits are
+     set here - and the row's horizontal rules have to be undone, because
+     the two share class names. */
+  .list-ad-card { text-decoration: none; color: inherit; align-items: flex-start; }
+  .list-ad-card .list-ad-shot { width: 72px; height: 72px; margin: 2px 0 4px; }
+  .list-ad-card .list-ad-head { font-size: 17px; font-weight: 600; }
+  .list-ad-card .list-ad-blurb { font-size: 13px; }
+  .list-ad-card .list-ad-cta { margin-top: auto; padding-top: 8px; margin-left: 0; }
   @media (max-width: 640px) {
     .list-ad-text { flex-basis: 100%; }
     .list-ad-cta { margin-left: auto; }
@@ -734,6 +740,6 @@
     <button type="button" id="cookie-accept" class="cookie-btn cookie-accept">Accept</button>
   </div>
 </div>
-<script src="/static/gmr-promo.js" defer></script>
+<script src="/static/gmr-promo.js?v=2" defer></script>
 </body>
 </html>
