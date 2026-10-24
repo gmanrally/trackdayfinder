@@ -136,6 +136,10 @@ templates.env.globals["sibling"] = _siblings.promo
 from . import partner as _partner  # noqa: E402
 templates.env.globals["gmr_promo"] = _partner.promo
 templates.env.globals["promo_every"] = _partner.PROMO_EVERY
+# Columns in the event table, so the promo row spans all of them. Counted
+# from _event_row.html rather than guessed: the forks differ (11 here), and
+# a colspan copied between them is silently wrong.
+templates.env.globals["promo_colspan"] = 11
 
 app = FastAPI(title="TrackdayFinder")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")

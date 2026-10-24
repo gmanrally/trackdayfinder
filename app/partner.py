@@ -38,8 +38,8 @@ PRODUCTS = [
         "slug": "peugeot-306-405-gti6-mi16-plug-and-play-itb-kit",
         "still": "/static/gmr/29-still.webp",
         "anim": "/static/gmr/29.webp",
-        "head": "Plug and play ITBs for the Mi16",
-        "blurb": "Bolt-on throttle bodies for the 306 and 405 GTi6 "
+        "head": "Plug and play ITBs for the GTi6 Mi16",
+        "blurb": "Bolt-on throttle bodies for the 306 and 405 "
                  "— no engine changes needed.",
     },
     {

@@ -11,7 +11,7 @@
 {% set _p = gmr_promo(promo_slot | default(0)) %}
 {% if _p %}
 <tr class="list-ad" data-promo="gmr">
-  <td colspan="11">
+  <td colspan="{{ promo_colspan }}">
     <a class="list-ad-inner" href="{{ _p.url }}" rel="noopener">
       <img class="list-ad-shot" src="{{ _p.still }}" alt="" width="52" height="52"
            loading="lazy" decoding="async">

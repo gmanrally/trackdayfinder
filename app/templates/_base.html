@@ -115,26 +115,37 @@
   .promo-row > .sp-card { flex: 1 1 440px; max-width: none; margin: 0; }
   .gmr-shot { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; }
   /* The GMR row inside the event list, one every partner.PROMO_EVERY events.
-     Tinted and labelled rather than disguised: it must not read as a trackday
-     to somebody scanning the table for a date. */
-  tr.list-ad > td { background: var(--card); padding: 10px 14px;
+     Tinted and labelled rather than disguised: it must not read as an event
+     to somebody scanning the table for a date.
+
+     It fills the row it is given. The table runs to 2000px on a desktop, and
+     a fixed-width card in the middle of it reads as something that failed to
+     load - so the text block grows, head and blurb share a line while there
+     is room, and both the image and the type scale with the viewport. */
+  tr.list-ad > td { background: var(--card);
+    padding: clamp(9px, 1vw, 15px) clamp(10px, 1.2vw, 20px);
     border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  .list-ad-inner { display: flex; align-items: center; gap: 14px;
+  .list-ad-inner { display: flex; align-items: center; width: 100%;
+    flex-wrap: wrap; gap: clamp(12px, 1.8vw, 26px);
     text-decoration: none; color: inherit; }
-  .list-ad-shot { width: 52px; height: 52px; object-fit: contain; flex: 0 0 auto; }
-  .list-ad-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .list-ad-kicker { font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
-    font-weight: 700; color: var(--muted); }
-  .list-ad-head { font-weight: 600; }
-  .list-ad-blurb { color: var(--muted); font-size: 13px; }
-  .list-ad-cta { margin-left: auto; white-space: nowrap; color: var(--accent);
-    font-size: 13px; font-weight: 600; }
+  .list-ad-shot { width: clamp(44px, 4.5vw, 72px); height: clamp(44px, 4.5vw, 72px);
+    object-fit: contain; flex: 0 0 auto; }
+  /* flex:1 is what closes the gap: without it the text keeps its own width
+     and the CTA's margin-left:auto strands it against the far edge. */
+  .list-ad-text { display: flex; flex: 1 1 320px; min-width: 0; flex-wrap: wrap;
+    align-items: baseline; row-gap: 2px; column-gap: clamp(10px, 1.4vw, 22px); }
+  .list-ad-kicker { flex: 0 0 100%; font-size: 10.5px; letter-spacing: .09em;
+    text-transform: uppercase; font-weight: 700; color: var(--muted); }
+  .list-ad-head { font-weight: 600; font-size: clamp(14px, 1vw, 17px); flex: 0 1 auto; }
+  .list-ad-blurb { color: var(--muted); font-size: clamp(12.5px, 0.85vw, 14.5px);
+    flex: 1 1 240px; min-width: 0; }
+  .list-ad-cta { flex: 0 0 auto; white-space: nowrap; color: var(--accent);
+    font-size: clamp(12.5px, 0.9vw, 14px); font-weight: 600; }
   .list-ad-card { display: flex; flex-direction: column; gap: 4px;
     background: var(--card); text-decoration: none; color: inherit; }
-  .list-ad-card .list-ad-cta { margin-left: 0; }
   @media (max-width: 640px) {
-    .list-ad-inner { flex-wrap: wrap; }
-    .list-ad-cta { margin-left: 0; }
+    .list-ad-text { flex-basis: 100%; }
+    .list-ad-cta { margin-left: auto; }
   }
   .gmr-kicker { font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
     font-weight: 700; color: var(--muted); }
