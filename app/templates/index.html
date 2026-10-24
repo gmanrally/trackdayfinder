@@ -38,11 +38,11 @@
 {% if view == 'cards' %}
 <div style="padding:14px 24px 0">
 <div id="results-list" class="space-cards">
-  {% for e in events %}{% include "_event_card.html" %}{% endfor %}
+  {% for e in events %}{% include "_event_card.html" %}{% if promo_every and loop.index % promo_every == 0 %}{% with promo_slot = loop.index // promo_every %}{% include "_promo_card.html" %}{% endwith %}{% endif %}{% endfor %}
 </div>
 </div>
 {% if has_more %}
-<div id="load-more" data-from="{{ next_from }}"
+<div id="load-more" data-from="{{ next_from }}" data-rendered="{{ events|length }}"
      style="padding:14px;text-align:center;color:var(--muted);font-size:13px">
   Loading more events…
 </div>
@@ -62,11 +62,11 @@
     <th>Stock</th><th>Book</th>
   </tr></thead>
   <tbody id="results-list">
-  {% for e in events %}{% include "_event_row.html" %}{% endfor %}
+  {% for e in events %}{% include "_event_row.html" %}{% if promo_every and loop.index % promo_every == 0 %}{% with promo_slot = loop.index // promo_every %}{% include "_promo_row.html" %}{% endwith %}{% endif %}{% endfor %}
   </tbody>
 </table>
 {% if has_more %}
-<div id="load-more" data-from="{{ next_from }}"
+<div id="load-more" data-from="{{ next_from }}" data-rendered="{{ events|length }}"
      style="padding:14px;text-align:center;color:var(--muted);font-size:13px">
   Loading more events…
 </div>
@@ -87,6 +87,11 @@
     function buildUrl() {
       const params = new URLSearchParams(window.location.search);
       params.set('from_offset', sentinel.getAttribute('data-from'));
+      // How many event rows the page already holds, so the server can
+      // carry on counting towards the next promo row. Chunks are date
+      // windows, not fixed counts: without this the row lands on the
+      // 50th of EACH chunk, which on a quiet month is every few rows.
+      params.set('rendered', sentinel.getAttribute('data-rendered') || '0');
       return '/_chunk?' + params.toString();
     }
     async function loadMore() {
@@ -98,6 +103,9 @@
         const data = await r.json();
         const container = document.getElementById('results-list');
         container.insertAdjacentHTML('beforeend', data.html);
+        if (typeof data.rendered === 'number') {
+          sentinel.setAttribute('data-rendered', String(data.rendered));
+        }
         if (data.has_more) {
           sentinel.setAttribute('data-from', data.next_from);
         } else {

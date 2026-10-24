@@ -135,6 +135,7 @@ from . import siblings as _siblings  # noqa: E402
 templates.env.globals["sibling"] = _siblings.promo
 from . import partner as _partner  # noqa: E402
 templates.env.globals["gmr_promo"] = _partner.promo
+templates.env.globals["promo_every"] = _partner.PROMO_EVERY
 
 app = FastAPI(title="TrackdayFinder")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
@@ -790,12 +791,29 @@ async def index_chunk(request: Request,
     if MARKETPLACE_ENABLED:
         from . import marketplace as _mkt
         chunk_listing_ids = _mkt.event_ids_with_listings()
-    html = "".join(
-        tmpl.render(e=ev, request=request, listing_event_ids=chunk_listing_ids)
-        for ev in events
-    )
+    # Continue the promo cadence from what the page already holds. Chunks
+    # are date windows, not fixed counts, so without this the row lands on
+    # the 50th of EACH chunk - which on a quiet month is every few rows.
+    try:
+        rendered = max(0, int(request.query_params.get("rendered") or 0))
+    except ValueError:
+        rendered = 0
+    every = _partner.PROMO_EVERY
+    promo_tmpl = templates.env.get_template(
+        "_promo_card.html" if _resolve_view(request, view) == "cards"
+        else "_promo_row.html")
+    parts = []
+    for i, ev in enumerate(events, start=1):
+        parts.append(tmpl.render(e=ev, request=request,
+                                 listing_event_ids=chunk_listing_ids))
+        n = rendered + i
+        if every and n % every == 0:
+            parts.append(promo_tmpl.render(request=request,
+                                           promo_slot=n // every))
+    html = "".join(parts)
     return {
         "html": html,
+        "rendered": rendered + len(events),
         "has_more": has_more,
         "next_from": offset + INDEX_PAGE_DAYS,
     }

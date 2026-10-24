@@ -1,0 +1,14 @@
+{# The card-view twin of _promo_row.html. Same disclosure, same product, shaped
+   like the event cards around it so it sits in the grid rather than breaking
+   it — but tinted and labelled so nobody mistakes it for a trackday. #}
+{% set _p = gmr_promo(promo_slot | default(0)) %}
+{% if _p %}
+<a class="ev-card list-ad-card" href="{{ _p.url }}" rel="noopener" data-promo="gmr">
+  <span class="list-ad-kicker">From the workshop behind this site</span>
+  <img class="list-ad-shot" src="{{ _p.still }}" alt="" width="64" height="64"
+       loading="lazy" decoding="async">
+  <span class="list-ad-head">{{ _p.head }}</span>
+  <span class="list-ad-blurb">{{ _p.blurb }}</span>
+  <span class="list-ad-cta">See the kit &rarr;</span>
+</a>
+{% endif %}

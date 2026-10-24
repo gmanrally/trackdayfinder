@@ -114,6 +114,28 @@
     flex-wrap: wrap; align-items: stretch; }
   .promo-row > .sp-card { flex: 1 1 440px; max-width: none; margin: 0; }
   .gmr-shot { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; }
+  /* The GMR row inside the event list, one every partner.PROMO_EVERY events.
+     Tinted and labelled rather than disguised: it must not read as a trackday
+     to somebody scanning the table for a date. */
+  tr.list-ad > td { background: var(--card); padding: 10px 14px;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .list-ad-inner { display: flex; align-items: center; gap: 14px;
+    text-decoration: none; color: inherit; }
+  .list-ad-shot { width: 52px; height: 52px; object-fit: contain; flex: 0 0 auto; }
+  .list-ad-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .list-ad-kicker { font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+    font-weight: 700; color: var(--muted); }
+  .list-ad-head { font-weight: 600; }
+  .list-ad-blurb { color: var(--muted); font-size: 13px; }
+  .list-ad-cta { margin-left: auto; white-space: nowrap; color: var(--accent);
+    font-size: 13px; font-weight: 600; }
+  .list-ad-card { display: flex; flex-direction: column; gap: 4px;
+    background: var(--card); text-decoration: none; color: inherit; }
+  .list-ad-card .list-ad-cta { margin-left: 0; }
+  @media (max-width: 640px) {
+    .list-ad-inner { flex-wrap: wrap; }
+    .list-ad-cta { margin-left: 0; }
+  }
   .gmr-kicker { font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
     font-weight: 700; color: var(--muted); }
   .sp-card {

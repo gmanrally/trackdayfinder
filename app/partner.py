@@ -53,10 +53,21 @@ PRODUCTS = [
 ]
 
 
-def promo() -> dict | None:
-    """Today's card, or None when the promo is switched off."""
+# How many events between GMR rows in the list. One in fifty is roughly
+# one per screenful of scrolling on a desktop - often enough to be seen,
+# rare enough that the list still reads as a list.
+PROMO_EVERY = 50
+
+
+def promo(slot: int = 0) -> dict | None:
+    """Today's card, or None when the promo is switched off.
+
+    `slot` walks the catalogue so two promo rows on one page are not the
+    same product. Still deterministic per day: a cached page stays honest
+    and a reload does not flicker the shop through its range.
+    """
     if not ENABLED:
         return None
-    p = PRODUCTS[date.today().toordinal() % len(PRODUCTS)]
+    p = PRODUCTS[(date.today().toordinal() + int(slot or 0)) % len(PRODUCTS)]
     return {**p, "url": f"{BASE}/product/{p['slug']}?{UTM}",
             "shop_url": f"{BASE}/shop?{UTM}"}

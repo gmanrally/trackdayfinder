@@ -1,0 +1,27 @@
+{# A GMR row in the event list, injected every PROMO_EVERY events.
+
+   Labelled, not slipped in. The same workshop builds this site and that shop,
+   and UK ad rules want a marketing communication to be identifiable as one —
+   "from the workshop behind this site" is both the honest line and the one most
+   likely to be trusted by somebody who has just used the site for free.
+
+   It spans the whole table rather than pretending to be an event: a row with a
+   date and a circuit column filled in would read as a trackday, and somebody
+   scanning for a date would stop on it by mistake. #}
+{% set _p = gmr_promo(promo_slot | default(0)) %}
+{% if _p %}
+<tr class="list-ad" data-promo="gmr">
+  <td colspan="11">
+    <a class="list-ad-inner" href="{{ _p.url }}" rel="noopener">
+      <img class="list-ad-shot" src="{{ _p.still }}" alt="" width="52" height="52"
+           loading="lazy" decoding="async">
+      <span class="list-ad-text">
+        <span class="list-ad-kicker">From the workshop behind this site</span>
+        <span class="list-ad-head">{{ _p.head }}</span>
+        <span class="list-ad-blurb">{{ _p.blurb }}</span>
+      </span>
+      <span class="list-ad-cta">See the kit &rarr;</span>
+    </a>
+  </td>
+</tr>
+{% endif %}
