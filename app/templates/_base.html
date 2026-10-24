@@ -114,44 +114,55 @@
     flex-wrap: wrap; align-items: stretch; }
   .promo-row > .sp-card { flex: 1 1 440px; max-width: none; margin: 0; }
   .gmr-shot { width: 76px; height: 76px; object-fit: contain; flex: 0 0 auto; }
-  /* The GMR row inside the event list, one every partner.PROMO_EVERY events.
-     Tinted and labelled rather than disguised: it must not read as an event
-     to somebody scanning the table for a date.
+  /* The GMR promotion, in two places: a row spanning the event table, and a
+     tile in the card grid. They share class names on purpose, so the rule
+     here is that the bare .list-ad-* classes carry APPEARANCE ONLY. Every
+     flex property is scoped to .list-ad-inner (the row) or .list-ad-card
+     (the tile).
 
-     It fills the row it is given. The table runs to 2000px on a desktop, and
-     a fixed-width card in the middle of it reads as something that failed to
-     load - so the text block grows, head and blurb share a line while there
-     is room, and both the image and the type scale with the viewport. */
+     That is not tidiness. .space-card is flex-direction:column, so an
+     unscoped `flex: 0 0 100%' on the kicker meant width in the row and
+     HEIGHT in the tile - the kicker filled the card and pushed the rest out
+     of it, on every screen size. */
+
+  /* appearance, shared by both */
+  .list-ad-shot { object-fit: contain; }
+  .list-ad-kicker { font-size: 10.5px; letter-spacing: .09em;
+    text-transform: uppercase; font-weight: 700; color: var(--muted); }
+  .list-ad-head { font-weight: 600; }
+  .list-ad-blurb { color: var(--muted); }
+  .list-ad-cta { white-space: nowrap; color: var(--accent); font-weight: 600; }
+
+  /* the row: fills the width it is given, because the table runs to 2000px
+     and a fixed-width card adrift in the middle of it reads as a failure */
   tr.list-ad > td { background: var(--card);
     padding: clamp(9px, 1vw, 15px) clamp(10px, 1.2vw, 20px);
     border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .list-ad-inner { display: flex; align-items: center; width: 100%;
     flex-wrap: wrap; gap: clamp(12px, 1.8vw, 26px);
     text-decoration: none; color: inherit; }
-  .list-ad-shot { width: clamp(44px, 4.5vw, 72px); height: clamp(44px, 4.5vw, 72px);
-    object-fit: contain; flex: 0 0 auto; }
-  /* flex:1 is what closes the gap: without it the text keeps its own width
-     and the CTA's margin-left:auto strands it against the far edge. */
-  .list-ad-text { display: flex; flex: 1 1 320px; min-width: 0; flex-wrap: wrap;
-    align-items: baseline; row-gap: 2px; column-gap: clamp(10px, 1.4vw, 22px); }
-  .list-ad-kicker { flex: 0 0 100%; font-size: 10.5px; letter-spacing: .09em;
-    text-transform: uppercase; font-weight: 700; color: var(--muted); }
-  .list-ad-head { font-weight: 600; font-size: clamp(14px, 1vw, 17px); flex: 0 1 auto; }
-  .list-ad-blurb { color: var(--muted); font-size: clamp(12.5px, 0.85vw, 14.5px);
-    flex: 1 1 240px; min-width: 0; }
-  .list-ad-cta { flex: 0 0 auto; white-space: nowrap; color: var(--accent);
-    font-size: clamp(12.5px, 0.9vw, 14px); font-weight: 600; }
-  /* Card view. Inherits .space-card, so only the advert-specific bits are
-     set here - and the row's horizontal rules have to be undone, because
-     the two share class names. */
+  .list-ad-inner .list-ad-shot { width: clamp(44px, 4.5vw, 72px);
+    height: clamp(44px, 4.5vw, 72px); flex: 0 0 auto; }
+  .list-ad-inner .list-ad-text { display: flex; flex: 1 1 320px; min-width: 0;
+    flex-wrap: wrap; align-items: baseline; row-gap: 2px;
+    column-gap: clamp(10px, 1.4vw, 22px); }
+  .list-ad-inner .list-ad-kicker { flex: 0 0 100%; }
+  .list-ad-inner .list-ad-head { flex: 0 1 auto; font-size: clamp(14px, 1vw, 17px); }
+  .list-ad-inner .list-ad-blurb { flex: 1 1 240px; min-width: 0;
+    font-size: clamp(12.5px, 0.85vw, 14.5px); }
+  .list-ad-inner .list-ad-cta { flex: 0 0 auto; margin-left: auto;
+    font-size: clamp(12.5px, 0.9vw, 14px); }
+
+  /* the tile: inherits .space-card (flex column), so it sets no flex basis
+     of its own - only the advert-specific sizing */
   .list-ad-card { text-decoration: none; color: inherit; align-items: flex-start; }
   .list-ad-card .list-ad-shot { width: 72px; height: 72px; margin: 2px 0 4px; }
-  .list-ad-card .list-ad-head { font-size: 17px; font-weight: 600; }
+  .list-ad-card .list-ad-head { font-size: 17px; }
   .list-ad-card .list-ad-blurb { font-size: 13px; }
-  .list-ad-card .list-ad-cta { margin-top: auto; padding-top: 8px; margin-left: 0; }
+  .list-ad-card .list-ad-cta { margin-top: auto; padding-top: 8px; }
+
   @media (max-width: 640px) {
-    .list-ad-text { flex-basis: 100%; }
-    .list-ad-cta { margin-left: auto; }
+    .list-ad-inner .list-ad-text { flex-basis: 100%; }
   }
   .gmr-kicker { font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
     font-weight: 700; color: var(--muted); }
