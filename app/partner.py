@@ -31,8 +31,8 @@ PRODUCTS = [
         "still": "/static/gmr/9-still.webp",
         "anim": "/static/gmr/9.webp",
         "head": "Individual throttle bodies for the K20",
-        "blurb": "Complete carbon induction kits, built to your engine "
-                 "and made in the UK.",
+        "blurb": "Complete carbon composite induction kits, built to your "
+                 "engine and made in the UK.",
     },
     {
         "slug": "peugeot-306-405-gti6-mi16-plug-and-play-itb-kit",
@@ -40,15 +40,58 @@ PRODUCTS = [
         "anim": "/static/gmr/29.webp",
         "head": "Plug and play ITBs for the GTi6 Mi16",
         "blurb": "Bolt-on throttle bodies for the 306 and 405 "
-                 "— no engine changes needed.",
+                 "\u2014 no engine changes needed.",
     },
     {
         "slug": "gmr-airbox-for-dcoe",
         "still": "/static/gmr/11-still.webp",
         "anim": "/static/gmr/11.webp",
-        "head": "Carbon airboxes, made to fit",
+        "head": "Carbon composite airboxes, made to fit",
         "blurb": "Flow-developed enclosed induction for SF/OBX and "
                  "DCOE throttle bodies.",
+    },
+    # The accessories. Cheaper, and what somebody who already has throttle
+    # bodies is actually short of. No turntable rendered for these yet, so
+    # they run as a still.
+    {
+        "slug": "gmr-sf-throttle-linkage",
+        "still": "/static/gmr/20-still.webp",
+        "anim": "",
+        "head": "Throttle linkage for SF/OBX bodies",
+        "blurb": "Three parts, one adjustment, and a quadrant shaped for "
+                 "control at small openings.",
+    },
+    {
+        "slug": "gmr-velocity-stacks-straight",
+        "still": "/static/gmr/25-still.webp",
+        "anim": "",
+        "head": "Velocity stacks, made to your spacing",
+        "blurb": "Carbon composite trumpets in any length, bored to suit "
+                 "your throttle bodies.",
+    },
+    {
+        "slug": "gmr-throttle-body-idle-vacuum-manifold",
+        "still": "/static/gmr/14-still.webp",
+        "anim": "",
+        "head": "Idle vacuum manifold for ITBs",
+        "blurb": "Brings every runner into one tapping. SF/OBX and DCOE "
+                 "versions.",
+    },
+    {
+        "slug": "gmr-sf-obx-throttle-body-idle-vacuum-manifold-copy",
+        "still": "/static/gmr/30-still.webp",
+        "anim": "",
+        "head": "K20 vacuum manifold",
+        "blurb": "One tapping off all four runners, for SF/OBX bodies on a "
+                 "K20.",
+    },
+    {
+        "slug": "honda-k20-tps-adaptor-kit",
+        "still": "/static/gmr/32-still.webp",
+        "anim": "",
+        "head": "Keep the factory K20 throttle sensor",
+        "blurb": "Carries the OEM TPS onto SF/OBX bodies \u2014 same plug, "
+                 "same calibration.",
     },
 ]
 

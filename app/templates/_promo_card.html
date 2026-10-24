@@ -11,7 +11,7 @@
 {% if _p %}
 <a class="space-card list-ad-card" href="{{ _p.url }}" rel="noopener" data-promo="gmr">
   <span class="list-ad-kicker">From the workshop behind this site</span>
-  <img class="list-ad-shot" src="{{ _p.still }}" data-anim="{{ _p.anim }}" alt=""
+  <img class="list-ad-shot" src="{{ _p.still }}"{% if _p.anim %} data-anim="{{ _p.anim }}"{% endif %} alt=""
        width="72" height="72" loading="lazy" decoding="async">
   <span class="list-ad-head">{{ _p.head }}</span>
   <span class="list-ad-blurb">{{ _p.blurb }}</span>
