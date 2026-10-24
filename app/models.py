@@ -103,6 +103,12 @@ class Click(SQLModel, table=True):
     clicked_at: datetime = Field(default_factory=datetime.utcnow)
     referrer: Optional[str] = None
     user_agent: Optional[str] = None
+    # Did this click come from one of our own pages? A direct hit on
+    # /go/<id> with no referrer is almost always a crawler that spoofed
+    # its user-agent past _looks_like_bot. Kept rather than dropped - a
+    # privacy extension strips referrers too - so reporting filters on
+    # this instead of trusting the raw count.
+    onsite: bool = Field(default=False, index=True)
 
 
 class Listing(SQLModel, table=True):
@@ -182,6 +188,13 @@ def init_db() -> None:
     # columns on live tables are added here. Idempotent and cheap.
     import sqlite3
     with sqlite3.connect(DB_PATH) as conn:
+        click_cols = {r[1] for r in conn.execute("PRAGMA table_info(click)")}
+        if click_cols and "onsite" not in click_cols:
+            conn.execute("ALTER TABLE click ADD COLUMN onsite BOOLEAN NOT NULL DEFAULT 0")
+            # Backfilled from the referrer already stored, so history and new
+            # rows answer the same question the same way.
+            conn.execute("UPDATE click SET onsite=1 WHERE referrer LIKE ?",
+                         ("%" + "trackdayfinder.co.uk" + "%",))
         cols = {r[1] for r in conn.execute("PRAGMA table_info(user)")}
         if "totp_secret" not in cols:
             conn.execute("ALTER TABLE user ADD COLUMN totp_secret VARCHAR")

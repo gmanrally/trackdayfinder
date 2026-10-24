@@ -2099,6 +2099,10 @@ async def robots():
         "User-agent: *\n"
         "Allow: /\n"
         "Disallow: /api/\n"
+        # Every booking link on the site lives under /go/. Crawlers walking
+        # them inflate the click counts we report to organisers, and the
+        # redirect is worthless to an index anyway.
+        "Disallow: /go/\n"
         f"Sitemap: {CANONICAL_HOST}/sitemap.xml\n"
     )
 
@@ -2132,12 +2136,14 @@ async def click_through(request: Request, event_id: int):
         if not ev:
             raise HTTPException(status_code=404, detail="Event not found")
         if not _looks_like_bot(ua):
+            ref = request.headers.get("referer") or ""
             s.add(Click(
                 event_id=event_id,
                 source=ev.source,
                 circuit=ev.circuit,
-                referrer=request.headers.get("referer"),
+                referrer=ref or None,
                 user_agent=ua[:200],
+                onsite="trackdayfinder.co.uk" in ref,
             ))
             s.commit()
         target = ev.booking_url
