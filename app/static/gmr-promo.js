@@ -17,7 +17,10 @@
 // Those get the still, which is the same part under the same lighting — it
 // loses the rotation, not the advert.
 (function () {
-  var shots = document.querySelectorAll('.gmr-shot[data-anim]');
+  // Any promo image, not just the footer card's: the row inside the event
+  // list carries the same turntable and was silently excluded by a
+  // class-based selector.
+  var shots = document.querySelectorAll('img[data-anim]');
   if (!shots.length) return;
 
   function unwanted() {

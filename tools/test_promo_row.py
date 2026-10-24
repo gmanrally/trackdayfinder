@@ -65,6 +65,15 @@ def main() -> int:
         bad.append("expected %d promo row(s) for %d events, got %d"
                    % (expected, events_shown, rows))
 
+    # the turntable has to be offered, or the row is a still forever
+    if rows:
+        seg = re.search(r'<tr class="list-ad".*?</tr>', r.text, re.S).group(0)
+        has_anim = 'data-anim=' in seg
+        print("  turntable offered ....... %s" % has_anim)
+        if not has_anim:
+            bad.append("the promo image carries no data-anim — gmr-promo.js has "
+                       "nothing to swap to and it stays a still")
+
     # it must not pretend to be an event
     for m in re.finditer(r'<tr class="list-ad"[^>]*>(.*?)</tr>', r.text, re.S):
         if 'data-label="Date"' in m.group(1):

@@ -5,7 +5,7 @@
 {% if _p %}
 <a class="ev-card list-ad-card" href="{{ _p.url }}" rel="noopener" data-promo="gmr">
   <span class="list-ad-kicker">From the workshop behind this site</span>
-  <img class="list-ad-shot" src="{{ _p.still }}" alt="" width="64" height="64"
+  <img class="list-ad-shot" src="{{ _p.still }}" data-anim="{{ _p.anim }}" alt="" width="64" height="64"
        loading="lazy" decoding="async">
   <span class="list-ad-head">{{ _p.head }}</span>
   <span class="list-ad-blurb">{{ _p.blurb }}</span>
