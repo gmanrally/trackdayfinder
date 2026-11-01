@@ -11,7 +11,7 @@ So this checks the four things that actually went wrong:
 
   * how many sources failed on their last run,
   * which sources have not succeeded in days, whatever last night said,
-  * which sources succeed but deliver nothing,
+  * which sources succeed but have stopped delivering anything,
   * whether browsers have been left running in this container.
 
 That third one was added after the worst outage yet, and it is the one
@@ -53,15 +53,23 @@ MAX_BROWSERS = int(os.environ.get("HEALTH_MAX_BROWSERS", "2"))
 # Unreaped exits are survivable in ones and tens; it is the slow climb
 # toward the pid ceiling that eventually takes the container down.
 MAX_ZOMBIES = int(os.environ.get("HEALTH_MAX_ZOMBIES", "200"))
-# How long a source may deliver nothing before it is worth a message.
-# Zero events is not proof of a fault: a UK club circuit finishes in
-# October and may not publish next season until the spring, and three of
-# ours were legitimately empty on the day this check was written. So the
-# report always lists who is delivering nothing and how long for — a
-# fortnight reads as out of season, five months reads as broken — and
-# only a gap this long turns into an email. Raise it over the winter if
-# the seasonal sources get noisy.
-QUIET_DAYS = int(os.environ.get("HEALTH_QUIET_DAYS", "21"))
+
+# Zero events is not proof of a fault. A UK club circuit finishes in
+# October and may not publish next season until spring, and four of ours
+# were legitimately empty on the day this check was written — Pembrey had
+# run its last day of the year, No Limits' page said so in as many words.
+# So "delivered nothing" is reported for everyone it applies to, with how
+# long it has been true, and only becomes an email when the source was
+# delivering within living memory: any retained run with events on it, or
+# nothing ever delivered at all.
+#
+# That phrasing is deliberate, and a day threshold was tried first and
+# thrown away. Any fixed number either nags all winter about circuits
+# that are closed, or sits quiet long enough for a real break to waste a
+# season. Asking "was this working recently?" separates the two without a
+# date in it, and it stops by itself: once the run history is all zeros —
+# RUN_RETENTION_DAYS, thirty — a source that is simply out of season goes
+# silent, having told you once.
 
 
 def _registered() -> set[str]:
@@ -112,6 +120,20 @@ def _last_delivery_per_source() -> dict[str, datetime]:
         rows = s.exec(select(Event.source, func.max(Event.last_seen))
                       .group_by(Event.source)).all()
     return {src: seen for src, seen in rows if seen}
+
+
+def _best_run_per_source() -> dict[str, int]:
+    """The most events any retained run of each source brought back.
+
+    The run table keeps five rows per source and thirty days, so a non-zero
+    figure here means "this was working lately" — which is what separates a
+    scraper that has broken from a circuit that has finished for the year.
+    """
+    from sqlalchemy import func
+    with session() as s:
+        rows = s.exec(select(ScrapeRun.source, func.max(ScrapeRun.n_events))
+                      .group_by(ScrapeRun.source)).all()
+    return {src: (n or 0) for src, n in rows}
 
 
 def _browser_procs() -> tuple[int, int]:
@@ -198,8 +220,9 @@ def check() -> dict:
     # put a row in the table, not from the run history, so the number is
     # honest about months as well as days.
     delivered = _last_delivery_per_source()
+    best = _best_run_per_source()
     quiet: list[str] = []
-    overdue: list[str] = []
+    broken: list[str] = []
     for slug in sorted(latest):
         run = latest[slug]
         if not run.ok or (run.n_events or 0) > 0:
@@ -207,13 +230,13 @@ def check() -> dict:
         seen = delivered.get(slug)
         days = None if seen is None else (now - seen).days
         quiet.append(f"{slug} ({'never' if days is None else str(days) + 'd'})")
-        if days is None or days >= QUIET_DAYS:
-            overdue.append(slug)
-    if overdue:
+        if seen is None or best.get(slug, 0) > 0:
+            broken.append(f"{slug} ({'never delivered' if days is None else str(days) + 'd ago'})")
+    if broken:
         problems.append(
-            f"{len(overdue)} sources have delivered no events for "
-            f"{QUIET_DAYS}+ days while their scrapes keep succeeding — "
-            f"check the listing markup still matches: {', '.join(overdue)}")
+            f"{len(broken)} sources were delivering events recently and now "
+            f"return none, while their scrapes keep succeeding — check the "
+            f"listing markup still matches: {', '.join(broken)}")
 
     browsers, zombies = _browser_procs()
     if browsers > MAX_BROWSERS:
