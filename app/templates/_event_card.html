@@ -39,7 +39,7 @@
     {%- endif -%}
     {% if e.session and e.session != 'day' %}<span class="pill" style="background:#fef3c7;color:#92400e">{{ e.session }}</span>{% endif %}
     {% if e.is_package %}<span class="pill" style="background:#dbeafe;color:#1e40af">package</span>{% endif %}
-    {% if _ev %}<span class="pill" title="{{ _ev.note }} (checked {{ ev_checked }} — confirm with organiser)"
+    {% if _ev %}<span class="pill" title="{{ _ev.note }} (checked {{ _ev.checked or ev_checked }} — confirm with organiser)"
       style="{% if _ev.status == 'banned' %}background:#fef2f2;color:#b91c1c{% elif _ev.status == 'allowed' %}background:#ecfdf5;color:#047857{% else %}background:#fef3c7;color:#92400e{% endif %}"
       >{% if _ev.status == 'banned' %}No EVs{% elif _ev.status == 'allowed' %}EV OK{% else %}EV OK*{% endif %}</span>{% endif %}
     {% if has_space %}
