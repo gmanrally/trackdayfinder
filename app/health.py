@@ -7,11 +7,21 @@ public pages stayed up and served stale listings throughout. Nothing
 announced it. The sister site had the quieter version: one source timing
 out at 02:00 six nights of eight while answering in 0.2s by day.
 
-So this checks the three things that actually went wrong:
+So this checks the four things that actually went wrong:
 
   * how many sources failed on their last run,
   * which sources have not succeeded in days, whatever last night said,
+  * which sources succeed but deliver nothing,
   * whether browsers have been left running in this container.
+
+That third one was added after the worst outage yet, and it is the one
+that had no symptoms. Europa rewrote its markup and dropped the
+schema.org microdata its scraper keyed on; Goodwood started abbreviating
+the month in its diary headings. Both kept answering 200 with a full page
+of events, so both scrapers kept finishing cleanly, reporting a
+successful run that found zero events, and neither of the checks above
+looks at how many. Europa — the second-largest source on the site — was
+dead for 20 days and Goodwood for 155 before anyone counted.
 
 Silence is the healthy state: it sends nothing when there is nothing to
 say. Run nightly after the refresh, and by hand with
@@ -43,6 +53,15 @@ MAX_BROWSERS = int(os.environ.get("HEALTH_MAX_BROWSERS", "2"))
 # Unreaped exits are survivable in ones and tens; it is the slow climb
 # toward the pid ceiling that eventually takes the container down.
 MAX_ZOMBIES = int(os.environ.get("HEALTH_MAX_ZOMBIES", "200"))
+# How long a source may deliver nothing before it is worth a message.
+# Zero events is not proof of a fault: a UK club circuit finishes in
+# October and may not publish next season until the spring, and three of
+# ours were legitimately empty on the day this check was written. So the
+# report always lists who is delivering nothing and how long for — a
+# fortnight reads as out of season, five months reads as broken — and
+# only a gap this long turns into an email. Raise it over the winter if
+# the seasonal sources get noisy.
+QUIET_DAYS = int(os.environ.get("HEALTH_QUIET_DAYS", "21"))
 
 
 def _registered() -> set[str]:
@@ -74,6 +93,25 @@ def _last_success_per_source() -> dict[str, datetime]:
                           .order_by(ScrapeRun.started_at)).all():
             out[run.source] = run.started_at
     return out
+
+
+def _last_delivery_per_source() -> dict[str, datetime]:
+    """When each source last put a row in the table.
+
+    Read off Event.last_seen rather than from the run history, which keeps
+    only five runs per source and thirty days — far too short to tell a
+    source that has been silent since May from one that stopped last week.
+    Rows themselves are never pruned once their date has passed, so this
+    reaches back as far as the source has ever delivered.
+
+    Two columns, so exec() yields tuples; a single-column select would hand
+    back bare scalars instead.
+    """
+    from sqlalchemy import func
+    with session() as s:
+        rows = s.exec(select(Event.source, func.max(Event.last_seen))
+                      .group_by(Event.source)).all()
+    return {src: seen for src, seen in rows if seen}
 
 
 def _browser_procs() -> tuple[int, int]:
@@ -156,6 +194,27 @@ def check() -> dict:
             f"{len(stale)} sources have not succeeded in {STALE_DAYS} days: "
             + ", ".join(stale[:12]) + (" …" if len(stale) > 12 else ""))
 
+    # Succeeding and delivering nothing. Measured from when the source last
+    # put a row in the table, not from the run history, so the number is
+    # honest about months as well as days.
+    delivered = _last_delivery_per_source()
+    quiet: list[str] = []
+    overdue: list[str] = []
+    for slug in sorted(latest):
+        run = latest[slug]
+        if not run.ok or (run.n_events or 0) > 0:
+            continue
+        seen = delivered.get(slug)
+        days = None if seen is None else (now - seen).days
+        quiet.append(f"{slug} ({'never' if days is None else str(days) + 'd'})")
+        if days is None or days >= QUIET_DAYS:
+            overdue.append(slug)
+    if overdue:
+        problems.append(
+            f"{len(overdue)} sources have delivered no events for "
+            f"{QUIET_DAYS}+ days while their scrapes keep succeeding — "
+            f"check the listing markup still matches: {', '.join(overdue)}")
+
     browsers, zombies = _browser_procs()
     if browsers > MAX_BROWSERS:
         problems.append(
@@ -179,6 +238,7 @@ def check() -> dict:
         "sources": len(latest),
         "failed": failed,
         "stale": stale,
+        "quiet": quiet,
         "browsers": browsers,
         "zombies": zombies,
         "upcoming": upcoming,
@@ -187,10 +247,18 @@ def check() -> dict:
 
 def _html(report: dict) -> str:
     items = "".join(f"<li>{p}</li>" for p in report["problems"])
+    # Listed whether or not it counted as a problem: the duration beside each
+    # slug is what separates an out-of-season circuit from a broken parser,
+    # and that judgement is the reader's to make.
+    quiet = report.get("quiet") or []
+    quiet_html = (
+        f"<p style=\"color:#555\">Delivering no events: {', '.join(quiet)}</p>"
+        if quiet else "")
     return f"""
       <p>{SITE} found {len(report['problems'])} problem(s) with the
          overnight refresh.</p>
       <ul>{items}</ul>
+      {quiet_html}
       <p style="color:#555">{report['sources']} sources ·
          {report['upcoming']} upcoming events ·
          <a href="{SITE_URL}">{SITE_URL}</a></p>
@@ -202,6 +270,9 @@ def _html(report: dict) -> str:
 def run_and_alert() -> dict:
     """Check, and email the owner if there is anything to report."""
     report = check()
+    if report.get("quiet"):
+        print(f"[health] {SITE}: delivering no events — "
+              f"{', '.join(report['quiet'])}")
     if not report["problems"]:
         print(f"[health] {SITE}: clean — {report['sources']} sources, "
               f"{report['upcoming']} upcoming")

@@ -1,10 +1,13 @@
 """Europa Trackdays — https://en.europatrackdays.com/calendar-full
 
-Aggregator listing ~1250 trackdays across UK + EU. SSR with schema.org
-microdata on every event card. We use it as a *gap-filler* — every event
-is checked against our existing DB by (date + canonical circuit +
-organiser-token overlap) and skipped if already covered by a primary
-scraper. Net effect: only events we wouldn't otherwise see are ingested.
+Aggregator listing ~600 trackdays across UK + EU, server-rendered. We use
+it as a *gap-filler* — every event is checked against our existing DB by
+(date + canonical circuit + organiser-token overlap) and skipped if already
+covered by a primary scraper. Net effect: only events we wouldn't otherwise
+see are ingested.
+
+The cards used to carry schema.org microdata and no longer do; see the note
+above CARD_SEL for the shape they have now and what is safe to key on.
 """
 from __future__ import annotations
 import re
@@ -108,18 +111,63 @@ CIRCUIT_NAME_MAP = {
     "red bull ring (spielberg)":    "Red Bull Ring",
 }
 
-# Cards: <a itemscope ... href="/trackday/<id>/<slug>">
-#         <meta itemprop="name" content="<Circuit> - <Organiser>" />
-#         <meta itemprop="description" content="..." />
-#         <time itemprop="startDate" datetime="YYYY-MM-DDTHH:mm+TZ"></time>
-CARD_RE = re.compile(
-    r'<a[^>]+itemscope[^>]+href="(https://en\.europatrackdays\.com/trackday/(\d+)/[a-z0-9-]+)".*?'
-    r'itemprop="name"\s+content="([^"]+)"\s*/?>.*?'
-    r'itemprop="description"\s+content="([^"]*)"\s*/?>.*?'
-    r'itemprop="startDate"\s+datetime="(\d{4}-\d{2}-\d{2})',
-    re.DOTALL,
-)
+# Cards. Until late 2026 each one was an <a itemscope> carrying schema.org
+# microdata — name as "<Circuit> - <Organiser>", a description, and a
+# startDate. All of it is gone: the markup is now plain divs with French
+# class names, and nothing on the page says schema.org any more. The site
+# kept answering 200 with 600-odd events on it, so the scraper went on
+# reporting a clean run with nothing found for months.
+#
+#   <a href="https://en.europatrackdays.com/trackday/33066/anneau-du-rhin-porsche-club-alsace-2026-11-01">
+#     <div class="agendaLigne">
+#       <div class="agendaElement agendaDate …"><span>Sunday</span>…</div>
+#       <div class="agendaElement agendaCircuit"><img alt="France"><span>Anneau du Rhin</span></div>
+#       <div class="agendaElement agendaOrganisateur"><span>Porsche Club Alsace</span></div>
+#       <div class="agendaElement agendaMeteo">10°</div>
+#       <div class="agendaElement agendaResume">Porsche day.</div>
+#
+# The date is taken from the tail of the href rather than from .agendaDate,
+# which gives a localised "Sunday 1 Nov" with no year on it. Every one of
+# the 608 links carries a trailing ISO date, and an id that doubles as the
+# dedup key — so the one durable thing on the page is the thing we key on.
+CARD_SEL = "div.agendaLigne"
+HREF_DATE_RE = re.compile(r"/trackday/(\d+)/[a-z0-9-]*?-(\d{4}-\d{2}-\d{2})/?$")
 PRICE_RE = re.compile(r"(?:from\s*)?(£|€)\s*([\d.,]+)", re.I)
+
+# The circuit's country comes off the flag image beside its name. The old
+# code hard-coded region="EU" on the grounds that UK events here are always
+# already covered by a primary scraper — true of most of the 89 UK cards,
+# but a small UK organiser nobody else lists would have been filed as EU.
+# Ireland groups with UK, matching SOURCE_REGION for trackdays_ie.
+UK_COUNTRIES = {"united kingdom", "great britain", "england", "scotland",
+                "wales", "northern ireland", "ireland"}
+
+
+def _card_text(card, cls: str) -> str:
+    node = card.css_first(f"div.{cls}")
+    if not node:
+        return ""
+    return " ".join(node.text(separator=" ", strip=True).split())
+
+
+def _card_country(card) -> str:
+    node = card.css_first("div.agendaCircuit img")
+    return (node.attributes.get("alt") or "") if node else ""
+
+
+def _card_href(card) -> str:
+    """The enclosing event link. The card is wrapped in its <a>, but walk up
+    a few levels rather than assuming the card is the anchor's only child."""
+    node = card.parent
+    for _ in range(3):
+        if node is None:
+            return ""
+        if (node.tag or "").lower() == "a":
+            href = node.attributes.get("href") or ""
+            if "/trackday/" in href:
+                return href
+        node = node.parent
+    return ""
 
 
 def _norm(s: str) -> str:
@@ -158,7 +206,14 @@ async def fetch() -> list[RawEvent]:
 
     out: list[RawEvent] = []
     seen: set[str] = set()
-    for href, eid, name, desc, dstr in CARD_RE.findall(html):
+    for card in tree.css(CARD_SEL):
+        href = _card_href(card)
+        if not href:
+            continue
+        m = HREF_DATE_RE.search(href)
+        if not m:
+            continue
+        eid, dstr = m.group(1), m.group(2)
         if eid in seen: continue
         seen.add(eid)
         try:
@@ -168,11 +223,11 @@ async def fetch() -> list[RawEvent]:
         if event_date < today:
             continue
 
-        # Split "Circuit - Organiser" — first ' - ' is the separator.
-        if " - " in name:
-            circuit_raw, organiser = [p.strip() for p in name.split(" - ", 1)]
-        else:
-            circuit_raw, organiser = name.strip(), "Europa Trackdays"
+        circuit_raw = _card_text(card, "agendaCircuit")
+        organiser = _card_text(card, "agendaOrganisateur") or "Europa Trackdays"
+        desc = _card_text(card, "agendaResume")
+        if not circuit_raw:
+            continue
 
         circuit = CIRCUIT_NAME_MAP.get(_norm(circuit_raw), circuit_raw)
 
@@ -231,7 +286,11 @@ async def fetch() -> list[RawEvent]:
             currency=currency,
             session="day",
             external_id=eid,
-            region="EU",
+            region=("UK" if _norm(_card_country(card)) in UK_COUNTRIES else "EU"),
+            # Deliberately not the card's own blurb: 129 of them mention a
+            # half-day, a morning or an evening as an option on the day, and
+            # ingest._infer_session reads notes to relabel the session, so
+            # passing it through would retitle a fifth of the listing.
             notes=f"Listed via Europa Trackdays — book at {organiser}.",
         ))
     return out

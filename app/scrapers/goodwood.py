@@ -6,7 +6,7 @@ track days, etc.). We filter to event titles containing "Track Day" excluding
 
 DOM structure (top-down):
   div.events-month                            month group
-    .events-month__sticky-text  -> "May" / "2026"
+    .events-month__sticky-text  -> "Nov2026" (was "May" / "2026")
     li.events-day                              one date
       .events-month__sticky-text -> "Sun 03"
       ul.event-day-list
@@ -34,6 +34,11 @@ NOISE_RE = re.compile(r"(\d{2,3})\s*db", re.I)
 MONTH_NAMES = {m: i for i, m in enumerate(
     ["January", "February", "March", "April", "May", "June",
      "July", "August", "September", "October", "November", "December"], start=1)}
+# The diary used to head each group with a full month name and now writes it
+# short — "Nov2026" where it said "May". Matching on the first three letters
+# takes both, and is why this is keyed that way rather than on the full name.
+MONTH_BY_PREFIX = {name[:3].lower(): num for name, num in MONTH_NAMES.items()}
+MONTH_YEAR_RE = re.compile(r"([A-Za-z]{3,9})\s*(20\d{2})")
 
 
 async def fetch() -> list[RawEvent]:
@@ -62,13 +67,23 @@ async def fetch() -> list[RawEvent]:
 
 
 def _parse_month(month_div: Node) -> tuple[Optional[int], Optional[int]]:
-    spans = month_div.css(".events-month__sticky-text span")
-    text = " ".join(s.text(strip=True) for s in spans if s.text(strip=True))
-    m_name = next((m for m in MONTH_NAMES if m in text), None)
-    y_match = re.search(r"(20\d{2})", text)
-    if not m_name or not y_match:
+    """Month and year off the group's own header.
+
+    Read from the first .events-month__sticky-text rather than from every
+    span under it: the same class labels each date inside the group, so the
+    old combined text was "Nov2026 Nov Nov 2026 Sun 01 Sat 07 …" and a
+    weekday could be mistaken for a month once abbreviations were allowed.
+    """
+    label = month_div.css_first(".events-month__sticky-text")
+    if not label:
         return None, None
-    return MONTH_NAMES[m_name], int(y_match.group(1))
+    m = MONTH_YEAR_RE.search(label.text(separator=" ", strip=True))
+    if not m:
+        return None, None
+    month = MONTH_BY_PREFIX.get(m.group(1)[:3].lower())
+    if not month:
+        return None, None
+    return month, int(m.group(2))
 
 
 def _parse_day_number(day_li: Node) -> Optional[int]:
