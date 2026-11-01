@@ -64,6 +64,11 @@ CIRCUIT_ALIASES = {
     # Open Pitlane give it as "Circuit Clastres", Europa as "Circuit de
     # Clastres"; the coords and country tables know it as "Clastres".
     "clastres": "Clastres",
+    # Drive Académie and the aggregators all say "Circuit de Mirecourt"; the
+    # coords and country tables know it as "Mirecourt". Europa's scraper
+    # carried its own alias for this, which left the name un-normalised for
+    # every other source.
+    "mirecourt": "Mirecourt",
 }
 
 

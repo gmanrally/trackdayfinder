@@ -12,6 +12,7 @@ organiser's own page; medium = ambiguous/secondary; low = inference.
 | three_sisters | **No EVs of any kind, including hybrids** | "Three Sisters Circuit will not allow electric vehicles of any kind - including hybrids" — threesisterscircuit.co.uk/cars/car-track-days | high |
 | trackday_solutions | **No EVs** (with open-wheelers, superkarts, SUVs) | "Open wheelers, Super karts, SUVs and Electric vehicles are not allowed." — trackday-solutions.co.uk/faq | high |
 | skylimit | **No EVs** (with large SUVs), all venues, EN/NL/DE/FR | "electric vehicles (EVs) and large SUVs are not permitted" — skylimitevents.com/en/event/113/document/15292 | high |
+| drive_academie | **No EVs** (with open-wheel single-seaters, karts and superkarts) | "Véhicules électriques interdits" and "Véhicules interdits : monoplaces à roues découvertes, karts, superkarts et véhicules électriques" — on every 2027 event page, e.g. driveacademie.com/produit/trackday-semaine-mirecourt-19-avril-2027/; restated in the organiser's listing request of 2026-11-01. Checked 2026-11-01 | high |
 
 ## Allowed with conditions
 
@@ -64,3 +65,7 @@ Special cases:
 3. ~70% of sources publish nothing → default display must be "check with organiser",
    never a green tick by omission (msevents/nurburgring_tf style medium evidence
    should display as "reported OK" not "allowed").
+4. Sources added after the original sweep carry their own `checked` date in
+   `ORGANISER_EV_POLICY`, which the templates prefer over the module-level
+   `CHECKED`. Adding one organiser must not imply the other claims were
+   re-verified that day. Drive Académie (2026-11-01) is the first of these.

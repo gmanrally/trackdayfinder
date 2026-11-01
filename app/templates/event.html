@@ -45,7 +45,7 @@
       {% if _ev.status == 'banned' %}not allowed{% elif _ev.status == 'allowed' %}allowed{% else %}allowed with conditions{% endif %}.</strong>
     {{ _ev.note }}.
     <a href="{{ _ev.url }}" target="_blank" rel="noopener" style="color:inherit">Source</a>
-    (checked {{ ev_checked }}) — policies change, always confirm with the organiser.
+    (checked {{ _ev.checked or ev_checked }}) — policies change, always confirm with the organiser.
   </div>
   {% endif %}
 

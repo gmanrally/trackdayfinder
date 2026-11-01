@@ -6,6 +6,10 @@ Two layers: a circuit-level ban overrides whatever the organiser allows.
 Display rule: only rows with a KNOWN policy get a pill — silence is never
 a green tick. Policies change, so every claim carries its source URL and
 the date we checked it, and copy should say "confirm with the organiser".
+
+CHECKED is when the original sweep was done. An entry added later carries
+its own "checked" key and the templates prefer it, so one new organiser
+never restates the age of everyone else's claim.
 """
 
 CHECKED = "2026-08-22"
@@ -56,6 +60,15 @@ ORGANISER_EV_POLICY = {
         "status": "banned",
         "note": "EVs (and large SUVs) are not permitted at Skylimit events",
         "url": "https://skylimitevents.com/en/event/113/document/15292",
+    },
+    "drive_academie": {
+        "status": "banned",
+        "note": "Electric vehicles are prohibited, with single-seaters and karts",
+        # Stated on each event page ("Véhicules électriques interdits") rather
+        # than in standing terms, so this points at a 2027 event rather than a
+        # permanent page. Their FAQ covers the 100dB limit but not EVs.
+        "url": "https://www.driveacademie.com/produit/trackday-semaine-mirecourt-19-avril-2027/",
+        "checked": "2026-11-01",
     },
 }
 

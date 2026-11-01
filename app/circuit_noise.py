@@ -42,4 +42,8 @@ CIRCUIT_STATIC_NOISE_DB: dict[str, int] = {
     "Mettet":                102,
     "Bilster Berg":          103,
     "Hockenheim":             95,
+    # "Niveau sonore maximum : 100 dB en dynamique" — published on every
+    # Drive Académie event page. Their own scraper reads it off the listing;
+    # this covers the aggregator rows for the same circuit.
+    "Mirecourt":             100,
 }

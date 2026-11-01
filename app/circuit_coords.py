@@ -81,7 +81,10 @@ CIRCUIT_COORDS: dict[str, tuple[float, float]] = {
     "Anneau du Rhin":                  (47.8500,  7.4136),
     "Croix-en-Ternois":                (50.4258,  2.2706),
     "Mas du Clos":                     (45.9667,  2.1667),
-    "Mirecourt":                       (48.3000,  6.1500),
+    # The circuit, not the town: the 3.75km track inside the Aéropôle Sud
+    # Lorraine at Juvaincourt (OSM way 1150785576). The previous rounded
+    # pair put the marker ~7km south-east, nearer an unrelated dirt oval.
+    "Mirecourt":                       (48.3201,  6.0810),
     "Lédenon":                         (43.9000,  4.5036),
     "Pôle Mécanique Alès Cévennes":    (44.1167,  4.0667),
     "Bresse":                          (46.5000,  5.2667),
