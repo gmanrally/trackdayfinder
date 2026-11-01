@@ -109,6 +109,26 @@ CIRCUIT_NAME_MAP = {
     "anneau du rhin":               "Anneau du Rhin",
     "red bull ring":                "Red Bull Ring",
     "red bull ring (spielberg)":    "Red Bull Ring",
+    # The circuit element gives the venue's full name where the old
+    # microdata gave "Circuit - Organiser" and this split on the first
+    # " - ". One venue has a hyphen in its own name and so arrived
+    # shortened before: keep answering to the name we already hold.
+    "castellet - driving center":   "Castellet",
+    # Same venue under a second name, each of which was getting its own
+    # circuit page. Mapped to whichever spelling already carries
+    # coordinates, so these land on the map instead of only in the table.
+    "torcy (vaison piste)":         "Vaison Piste",
+    "val de vienne":                "Val de Vienne / Le Vigeant",
+    "andalucia":                    "Andalucia Circuit",
+    "le luc":                       "Le Luc (circuit du Var)",
+    "mondello":                     "Mondello Park",
+    "motorland aragon":             "Aragon Motorland",
+    "ouest parisien":               "Circuits de l'Ouest Parisien (Dreux)",
+    "meppen circuit":               "Meppen Racepark",
+    # Neither spelling has coordinates yet; mapped so the Czech circuit is
+    # one page rather than two once it does (trackdays.events writes it
+    # without the accent, which _norm already folds away).
+    "sosnova":                      "Sosnova",
 }
 
 # Cards. Until late 2026 each one was an <a itemscope> carrying schema.org
@@ -198,7 +218,16 @@ async def fetch() -> list[RawEvent]:
 
     covered: dict[date, list[tuple[set[str], set[str], str, str]]] = {}
     with db_session() as s:
-        for e in s.exec(select(Event).where(Event.event_date >= today)).all():
+        # Everything but our own rows. This is a gap-filler against the
+        # primary scrapers, and including its own output made the second run
+        # after a successful one dedup every event against itself and emit
+        # nothing — 385 events, then 0, then a hole in the listing whenever
+        # the 14-day stale prune caught up with rows that were still live.
+        # trackdays_events, the other aggregator here, has always excluded
+        # itself; this one never did, and only showed it once it was
+        # delivering again.
+        for e in s.exec(select(Event).where(Event.event_date >= today,
+                                            Event.source != SOURCE_SLUG)).all():
             covered.setdefault(e.event_date, []).append(
                 (_tokens(e.circuit), _tokens(e.organiser),
                  _flat(e.circuit), _flat(e.organiser))
